@@ -121,6 +121,7 @@ textarea{resize:vertical;min-height:58px}
 .chipsec{font-size:12px;font-weight:700;color:var(--ok);align-self:center;margin:0 2px 0 8px}
 .chipsec:first-child{margin-left:0}
 .rw .wipt{background:#fff1a8}
+.reldata{margin-top:10px;padding:10px;border-radius:10px;background:var(--ok-bg)}
 .stepbox{border:2px solid var(--ink);border-radius:12px;padding:12px;background:#fff}
 .stepbox .m{font-size:13px;color:var(--ink-soft)}
 .rw .cur{background:var(--pick)}
@@ -150,7 +151,7 @@ textarea{resize:vertical;min-height:58px}
 <div class="sheet" id="sheet"><div class="inner" id="sheetInner"></div></div>
 <div class="verdict" id="verdict"><div class="vbox" id="vbox"></div></div>
 
-<script src="common.js?v=5"></script>
+<script src="common.js?v=6"></script>
 <script>
 let B = null;              // boot: 글, 카드, 단서, 구역
 let S = null;              // 우리 모둠 상태
@@ -331,9 +332,10 @@ function renderRewrite() {
       <div class="stepbox">
         <div class="m"><b>${esc(it.sec)}</b> · ${at >= 0 ? `${at + 1} / ${list.length}` : ''} ${it.added ? '· 새로 넣는 문장' : ''}</div>
         ${it.added ? '' : `<div class="orig"><b>원문</b> ${esc(it.orig)}</div>`}
-        ${tags.map(f => `<div class="rec ${f.found ? 'full' : 'part'}" style="margin:6px 0 0"><div class="m"><b>${esc(f.card)}</b> · 담당 ${esc(f.role)}${f.found ? ' · ✔ 우리 모둠이 찾음' : ' · 이제 공개'}${f.evidence ? ` · 추천 자료 ${esc(f.evidence)}` : ''}</div>${esc(f.note)}</div>`).join('')}
+        ${tags.map(f => `<div class="rec ${f.found ? 'full' : 'part'}" style="margin:6px 0 0"><div class="m"><b>${esc(f.card)}</b> · 담당 ${esc(f.role)}${f.found ? ' · ✔ 우리 모둠이 찾음' : ' · 이제 공개'}${f.evidence ? ` · 추천 ${esc(dataLabel(f.evidence))}` : ''}</div>${esc(f.note)}</div>`).join('')}
         ${!tags.length && !it.added && pk[it.key] ? '<div class="rec part" style="margin:6px 0 0">우리 모둠이 1라운드에서 짚은 문장이에요. 숨은 결함은 아니었지만 더 낫게 고쳐도 돼요.</div>' : ''}
         ${it.saved ? `<div class="m" style="margin-top:8px">💾 ${esc(it.saved.who || it.saved.role)}(${esc(it.saved.role)})이 저장함${it.draft ? ' · 지금 고치는 중인 내용은 아직 저장 전' : ''}</div>` : ''}
+        ${relDataHTML(it, tags)}
         <label>${it.del ? '이 문장은 빼기로 했어요' : '고친 문장'}</label>
         <textarea id="lineText" data-rw="${esc(it.key)}" style="min-height:96px" ${it.del ? 'disabled' : ''} placeholder="${it.added ? '새 문장을 쓰세요. 아래 카드 상자의 카드를 눌러 넣어도 돼요.' : ''}">${esc(it.text)}</textarea>
         <label for="lineReason">왜 이렇게 바꿨나요? <span style="font-weight:400;color:var(--ink-soft)">(상호 심사 때 다른 모둠이 이 이유를 보고 타당한지 판단해요)</span></label>
@@ -349,6 +351,17 @@ function renderRewrite() {
       <h3>미리 보기 (우리 모둠 글 전체)</h3>${B.sections.map(sec => `<div class="m" style="font-size:12.5px;color:var(--ok);font-weight:700;margin-top:6px">${esc(sec.name)}</div><div class="rw" style="font-size:15.5px">${items.filter(i => i.sec === sec.name && !i.del && i.text.trim()).map(i => `<span class="${i.key === curKey ? 'cur' : ''} ${i.saved && i.changed ? 'chg' : ''} ${i.draft ? 'wipt' : ''}">${esc(i.text)}</span>`).join(' ')}</div>`).join('')}
     </div>`;
   renderToolbox();
+}
+/* 이 문장과 관련된 자료: 원문에 나온 자료 번호 + 결함의 추천 자료 */
+function dataLabel(id) { const d = S.data.find(x => x.id === id); return d ? d.name + ' · ' + d.loc : id; }
+function relDataHTML(it, tags) {
+  const ids = new Set(tags.map(f => f.evidence).filter(Boolean));
+  const names = new Set((it.orig.match(/자료\s*\d+/g) || []).map(x => x.replace(/\s+/g, ' ')));
+  const list = S.data.filter(d => !d.locked && (ids.has(d.id) || names.has(d.name)));
+  if (!list.length) return '';
+  return `<div class="reldata"><div class="m"><b>📂 이 문장에 쓸 자료</b> · 누르면 고친 문장 칸에 출처와 함께 들어가요</div>` +
+    list.map(d => `<button class="card tcard" data-ins="${esc(d.name + ' · ' + d.loc + '에 따르면, ' + d.text + ' ')}" style="display:block;width:100%;margin-top:6px;text-align:left">
+      <b style="color:var(--ok)">${esc(d.name)} · ${esc(d.loc)}</b>${ids.has(d.id) ? ' <span class="tag" style="background:var(--gold)">추천</span>' : ' <span class="tag" style="background:var(--ink-soft)">원문에 쓰인 자료</span>'}<br>${esc(d.text)}</button>`).join('') + `</div>`;
 }
 function curSec() { const it = allItems().find(i => i.key === curKey); return it ? it.sec : ''; }
 function unsaved() { return Object.keys(lineDraft).length > 0; }
