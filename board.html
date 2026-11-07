@@ -114,7 +114,7 @@ header{display:flex;align-items:center;gap:14px;padding:10px 20px;color:#e8efec;
 <div class="login" id="login"><div class="box"><b>교사 비밀번호</b><input type="password" id="pin" inputmode="numeric" autocomplete="off"><div style="display:flex;gap:8px"><button class="tool red" id="pinOk" style="flex:1">확인</button><button class="tool" id="pinCancel">닫기</button></div><div id="pinMsg" style="color:var(--stamp);margin-top:8px"></div></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="common.js?v=3"></script>
+<script src="common.js?v=4"></script>
 <script>
 let B = null, D = null, pin = sessionGet('case_pin') || '', sel = null, gtab = 1, cardSel = '', revealDone = false;
 let fs = Number(store('case_fs')) || 22;
@@ -294,7 +294,17 @@ document.addEventListener('click', e => {
   const gt = t.closest('[data-gt]'); if (gt) { gtab = Number(gt.dataset.gt); render(); return; }
   const cs = t.closest('[data-cs]'); if (cs) { cardSel = cs.dataset.cs; render(); return; }
   const ph = t.closest('[data-ph]'); if (ph && teacher()) { go(Number(ph.dataset.ph)); return; }
-  if (t.id === 'next') return go(Math.min(5, phase() + 1));
+  if (t.id === 'next') {
+    if (phase() === 2) {
+      const left = Object.keys(D.progress).filter(g => !D.progress[g].rewrite);
+      if (left.length && !confirm2(t, left.join(', ') + '모둠 저장 전! 그래도 넘기기')) return;
+    }
+    if (phase() === 3) {
+      const n = Object.keys(D.progress).length - 1, left = Object.keys(D.progress).filter(g => D.progress[g].reviews < n);
+      if (left.length && !confirm2(t, left.join(', ') + '모둠 심사 덜 함! 그래도 넘기기')) return;
+    }
+    return go(Math.min(5, phase() + 1));
+  }
   if (t.id === 'prev') return go(Math.max(0, phase() - 1));
   if (t.id === 'reveal') { revealDone = false; return go(5, true); }
   if (t.id === 'plus') { fs = Math.min(40, fs + 2); store('case_fs', fs); render(); return; }

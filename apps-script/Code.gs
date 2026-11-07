@@ -374,15 +374,16 @@ function studentState(group) {
   mine.filter(e => e.type === 'find' && e.result).forEach(e => {
     const [kind, code] = e.result.split(':');
     const f = flaws.find(x => x.code === code); if (!f) return;
-    const cur = found[code] || { code, section: f.section, keys: f.keys, kind: 'part', card: '', evidence: '', tries: 0 };
-    if (kind === 'full') { cur.kind = 'full'; cur.card = f.card; cur.evidence = f.evidence; }
+    const cur = found[code] || { code, section: f.section, keys: f.keys, kind: 'part', card: '', evidence: '', note: '', tries: 0, hitKeys: [] };
+    e.keys.forEach(k => { if (f.keys.indexOf(k) >= 0 && cur.hitKeys.indexOf(k) < 0) cur.hitKeys.push(k); });   // 학생이 실제로 누른 문장만
+    if (kind === 'full') { cur.kind = 'full'; cur.card = f.card; cur.evidence = f.evidence; cur.note = f.note; }
     else cur.tries++;
     found[code] = cur;
   });
   const data = data_();
   const opened = {};
   Object.values(found).forEach(f => { if (f.kind === 'full' && f.evidence) opened[f.evidence] = true; });
-  const allOpen = st.phase >= 2;
+  const allOpen = st.phase >= 1;   // 자료 상자는 1라운드부터 모두 공개 (결함 판단에 필요)
   const hints = mine.filter(e => e.type === 'hint').map(e => ({ text: e.problem }));
   const rewrites = {};
   log.filter(e => e.type === 'rewrite').forEach(e => { rewrites[e.group] = rewrites[e.group] || {}; rewrites[e.group][e.target] = { text: e.fix, role: e.role, time: e.time }; });
@@ -391,7 +392,7 @@ function studentState(group) {
   return {
     state: st,
     finds: mine.filter(e => e.type === 'find').map(e => ({ id: e.id, role: e.role, keys: e.keys, quote: e.quote, card: e.card, problem: e.problem, fix: e.fix, result: e.result.split(':')[0] || 'none' })).reverse(),
-    found: Object.values(found).map(f => ({ code: f.code, section: f.section, keys: f.keys, kind: f.kind, card: f.card, evidence: f.evidence, locked: f.kind !== 'full' && f.tries >= 2 })),
+    found: Object.values(found).map(f => ({ code: f.code, section: f.section, keys: f.hitKeys, kind: f.kind, card: f.card, evidence: f.evidence, note: f.note, locked: f.kind !== 'full' && f.tries >= 2 })),
     data: data.map(d => (allOpen || opened[d.id]) ? d : { id: d.id, name: d.name, loc: d.loc, locked: true }),
     hints: hints,
     rewrites: st.phase >= 3 ? rewrites : { [group]: rewrites[group] || {} },
@@ -460,7 +461,7 @@ function submitFind(p) {
   const out = { msg };
   if (msg === 'full') {
     const f = flaws.find(x => 'full:' + x.code === result);
-    out.card = f.card; out.section = f.section; out.roleHit = f.role === p.role;
+    out.card = f.card; out.section = f.section; out.roleHit = f.role === p.role; out.note = f.note;
     const d = data_().find(x => x.id === evidence); if (d) out.evidence = d;
   }
   return out;

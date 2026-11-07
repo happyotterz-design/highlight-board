@@ -84,6 +84,12 @@ table.pts td:last-child{text-align:right;font-family:var(--mono);font-weight:700
 .cards{display:flex;flex-wrap:wrap;gap:6px}
 .card{border:1.5px solid var(--rule);background:#fff;border-radius:8px;padding:8px 10px;font-size:14.5px;cursor:pointer;text-align:left}
 .card.on{background:var(--stamp);border-color:var(--stamp);color:#fff;font-weight:700}
+.cardgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.cardgrid .card{display:flex;flex-direction:column;gap:2px;padding:8px 9px}
+.cardgrid .card small{font-size:12px;line-height:1.35;color:var(--ink-soft);font-weight:400}
+.cardgrid .card.on small{color:#fde}
+@media (max-width:640px){.cardgrid{grid-template-columns:repeat(2,1fr)}}
+body.sheeton main{padding-bottom:75vh}
 .carddesc{font-size:13.5px;color:var(--ink-soft);min-height:20px;margin:6px 0 2px}
 label{display:block;font-size:14.5px;font-weight:700;margin:10px 0 4px}
 textarea,input[type=text]{width:100%;font-size:16px;padding:9px 11px;border:1.5px solid var(--rule);border-radius:9px;font-family:inherit;background:#fff}
@@ -130,7 +136,7 @@ textarea{resize:vertical;min-height:58px}
 <div class="sheet" id="sheet"><div class="inner" id="sheetInner"></div></div>
 <div class="verdict" id="verdict"><div class="vbox" id="vbox"></div></div>
 
-<script src="common.js?v=3"></script>
+<script src="common.js?v=4"></script>
 <script>
 let B = null;              // boot: 글, 카드, 단서, 구역
 let S = null;              // 우리 모둠 상태
@@ -195,24 +201,26 @@ function renderFind() {
           return `<span class="s ${picked.has(k) ? 'pick' : ''} ${isFull ? 'hit' : isPart ? 'part' : ''}" data-k="${k}">${esc(s)}</span>${tags} `;
         }).join('') + `</div></div>`).join('') + `</div>`;
   } else if (tab === 'evidence') {
-    body = `<div class="paper"><h2>증거물 보관함</h2><p class="muted">결함을 찾으면 관련 증거물이 열립니다. 2라운드가 시작되면 모두 열려요.</p>` +
+    body = `<div class="paper"><h2>자료 상자</h2><p class="muted">글쓴이가 쓸 수 있었던 자료들입니다. 보고서와 비교해 보세요. 보고서가 빼먹은 자료, 잘못 쓴 자료가 결함의 단서예요.</p>` +
       S.data.map(d => d.locked ? `<div class="ev locked">🔒 ${esc(d.name)} · ${esc(d.loc || '')} · 아직 확보하지 못한 증거물</div>`
         : `<div class="ev"><div class="h">${esc(d.name)} · ${esc(d.loc)}</div><div class="b">${esc(d.text)}</div></div>`).join('') + `</div>`;
   } else {
     body = `<div class="paper"><h2>우리 모둠 수사 기록</h2>` +
+      `<h3>모은 수정 단서 ${S.found.filter(f => f.kind === 'full').length}장</h3>` + (S.found.filter(f => f.kind === 'full').map(f => `<div class="rec full"><div class="m">${esc(f.section)} · <b>${esc(f.card)}</b></div>${esc(f.note || '')}</div>`).join('') || '<p class="muted">결함을 찾으면 여기에 모여요. 2라운드 고쳐 쓰기 때 씁니다.</p>') +
       (S.hints.length ? `<h3>사용한 힌트</h3>${S.hints.map(h => `<div class="rec">💡 ${esc(h.text)}</div>`).join('')}` : '') +
       `<h3>제출한 의견 ${S.finds.length}개</h3>` +
       (S.finds.map(f => `<div class="rec ${f.result}"><div class="m">${esc(f.role)} · ${esc(f.card)} · ${f.result === 'full' ? '결함 발견' : f.result === 'part' ? '문장만 맞음' : '기록됨'}</div>
         <div class="m">“${esc(f.quote.length > 70 ? f.quote.slice(0, 70) + '…' : f.quote)}”</div>${f.problem ? `<div><b>이유</b> ${esc(f.problem)}</div>` : ''}</div>`).join('') || '<p class="muted">아직 없어요.</p>') + `</div>`;
   }
-  $('main').innerHTML = `<div class="counter"><span>우리 모둠 확보 결함</span><span class="n">${full} / ${B.flawCount}</span><span>· 증거물 ${ev} / ${S.data.length}</span>
+  $('main').innerHTML = `<div class="counter"><span>우리 모둠 확보 결함</span><span class="n">${full} / ${B.flawCount}</span><span>· 수정 단서 ${full}장</span>
       <button class="hintbtn" id="hint">💡 힌트 (−${B.hintCost})</button></div>
-    <div class="tabs"><button data-tab="report" class="${tab === 'report' ? 'on' : ''}">보고서</button><button data-tab="evidence" class="${tab === 'evidence' ? 'on' : ''}">증거물</button><button data-tab="log" class="${tab === 'log' ? 'on' : ''}">수사 기록</button><button data-tab="clue">내 단서</button></div>${body}`;
+    <div class="tabs"><button data-tab="report" class="${tab === 'report' ? 'on' : ''}">보고서</button><button data-tab="evidence" class="${tab === 'evidence' ? 'on' : ''}">자료 상자</button><button data-tab="log" class="${tab === 'log' ? 'on' : ''}">수사 기록</button><button data-tab="clue">내 단서</button></div>${body}`;
   renderFindSheet();
 }
 function renderFindSheet() {
   const show = phase() === 1 && tab === 'report' && picked.size > 0;
   $('sheet').classList.toggle('show', show);
+  document.body.classList.toggle('sheeton', show);
   if (!show) return;
   if ($('sheetInner').dataset.mode === 'find' && editing) {           // 입력 중이면 인용만 갱신
     $('quote').innerHTML = quoteHTML(); return;
@@ -220,8 +228,8 @@ function renderFindSheet() {
   const keepP = $('problem')?.value || '';
   $('sheetInner').dataset.mode = 'find';
   $('sheetInner').innerHTML = `<div class="quote" id="quote">${quoteHTML()}</div>
-    <label>결함 이름 고르기</label><div class="cards">${B.cards.map(c => `<button class="card ${card === c.name ? 'on' : ''}" data-card="${esc(c.name)}">${esc(c.name)}</button>`).join('')}</div>
-    <div class="carddesc" id="carddesc">${esc(B.cards.find(c => c.name === card)?.desc || '카드를 누르면 뜻이 보여요.')}</div>
+    <label>어떤 결함일까? 카드 고르기</label><div class="cardgrid">${B.cards.map(c => `<button class="card ${card === c.name ? 'on' : ''}" data-card="${esc(c.name)}"><b>${esc(c.name)}</b><small>${esc(c.desc)}</small></button>`).join('')}</div>
+    <div class="carddesc" id="carddesc"></div>
     <label for="problem">왜 문제일까? <span style="font-weight:400;color:var(--ink-soft)">(한 줄, 안 써도 됨 · 고치는 건 2라운드에서)</span></label><input type="text" id="problem" maxlength="300" placeholder="예) 블로그 수치라서 믿기 어렵다" value="${esc(keepP)}">
     <div class="btns"><button class="btn ghost" id="cancel">선택 취소</button><button class="btn red" id="submitFind">수사 결과 제출</button></div><div class="msg" id="msg"></div>`;
 }
@@ -231,7 +239,7 @@ function showVerdict(r) {
   let h = '';
   if (r.msg === 'full') {
     h = `<div class="stampmark">결함 발견</div><div class="t"><b>${esc(r.section)}</b>에서 「<b>${esc(r.card)}</b>」 결함을 찾았다!${r.roleHit ? '<br><span class="ok">내 역할 담당 결함이다. 보너스 +1</span>' : ''}</div>` +
-      (r.evidence ? `<div class="ev"><div class="h">🔓 증거물 확보 · ${esc(r.evidence.name)} · ${esc(r.evidence.loc)}</div><div class="b">${esc(r.evidence.text)}</div></div>` : '');
+      `<div class="ev"><div class="h">🔓 수정 단서 확보</div><div class="b">${esc(r.note || '')}</div>${r.evidence ? `<div class="m" style="margin-top:6px;font-size:13px;color:var(--ok)">추천 자료 · ${esc(r.evidence.name)} · ${esc(r.evidence.loc)}</div>` : ''}</div>`;
   } else if (r.msg === 'part') {
     h = `<div class="stampmark gold">아깝다</div><div class="t">문장은 맞았다! 이 문장에는 결함이 숨어 있다.<br>그런데 결함 이름이 다르다. 이 결함에 남은 기회는 한 번 더 있다.</div>`;
   } else if (r.msg === 'already') {
@@ -263,8 +271,13 @@ function renderRewrite() {
         <label>고쳐 쓴 글</label><textarea data-rw="${esc(sec.name)}" style="min-height:200px">${esc(val)}</textarea>
         <div class="btns" style="margin-top:6px"><button class="btn ghost" data-clear="${esc(sec.name)}">글 칸 비우기</button>${sv && draft[sec.name] != null && draft[sec.name] !== sv.text ? `<button class="btn ghost" data-load="${esc(sec.name)}">모둠이 저장한 글 불러오기</button>` : ''}</div></div>`;
     }).join('') +
-    `<div class="paper"><div class="btns" style="margin-top:0"><button class="btn red" id="saveRw">모둠 글 저장</button></div><div class="msg" id="msg"></div></div>`;
+    `<div class="paper"><div class="btns" style="margin-top:0"><button class="btn red" id="saveRw">모둠 글 저장</button></div><div class="msg" id="msg">${unsaved() ? '⚠ 저장하지 않은 고친 글이 있어요. 다음 라운드로 넘어가기 전에 꼭 저장하세요.' : ''}</div></div>`;
   renderToolbox();
+}
+
+function unsaved() {
+  const saved = (S.rewrites[me.group] || {});
+  return myZone().some(n => draft[n] != null && draft[n] !== (saved[n] ? saved[n].text : B.sections.find(x => x.name === n)?.sentences.join(' ')));
 }
 
 /* 카드 상자 (화면 아래 고정) */
@@ -358,7 +371,8 @@ function render() {
   const p = phase();
   if (p !== 1 && p !== 2) $('sheet').classList.remove('show');
   if (p !== 2) document.body.classList.remove('tool');
-  if (tab === 'clue' && p === 1) { $('main').innerHTML = `<div class="tabs"><button data-tab="report">보고서</button><button data-tab="evidence">증거물</button><button data-tab="log">수사 기록</button><button data-tab="clue" class="on">내 단서</button></div><div class="paper"><h2>내 비밀 단서</h2>${clueHTML()}</div>`; return; }
+  if (p !== 1) document.body.classList.remove('sheeton');
+  if (tab === 'clue' && p === 1) { $('main').innerHTML = `<div class="tabs"><button data-tab="report">보고서</button><button data-tab="evidence">자료 상자</button><button data-tab="log">수사 기록</button><button data-tab="clue" class="on">내 단서</button></div><div class="paper"><h2>내 비밀 단서</h2>${clueHTML()}</div>`; return; }
   [renderBrief, renderFind, renderRewrite, renderReview, renderSelf, renderResult][p]();
 }
 
@@ -456,7 +470,7 @@ document.addEventListener('focusin', e => { if (e.target.dataset && e.target.dat
 document.addEventListener('pointerdown', e => { if (e.target.closest('.tcard, [data-tt]')) e.preventDefault(); });
 document.addEventListener('input', e => {
   if (e.target.id === 'problem') editing = true;
-  if (e.target.dataset && e.target.dataset.rw) { draft[e.target.dataset.rw] = e.target.value; store('case_draft', draft); }
+  if (e.target.dataset && e.target.dataset.rw) { draft[e.target.dataset.rw] = e.target.value; store('case_draft', draft); const m = $('msg'); if (m && !m.classList.contains('err')) m.textContent = '⚠ 저장하지 않은 고친 글이 있어요.'; }
 });
 
 /* 팝업 대신 두 번 누르기 */
