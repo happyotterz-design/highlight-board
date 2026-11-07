@@ -2,213 +2,430 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>사건파일 · 수사 수첩</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@700;800&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Nanum+Gothic+Coding:wght@400;700&display=swap">
 <style>
-  :root{
-    --bg:#f6f5f1; --card:#ffffff; --ink:#22252a; --muted:#6b7078; --line:#dedbd2;
-    --pick:#ffe36e; --mine:#fff4bf; --accent:#2f5d8a; --danger:#b3412f;
-  }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif;-webkit-text-size-adjust:100%}
-  header{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line);padding:10px 16px}
-  h1{font-size:17px;margin:0 0 8px}
-  .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}
-  .label{font-size:13px;color:var(--muted);min-width:34px}
-  .chip{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:8px 14px;font-size:15px;min-height:40px;cursor:pointer}
-  .chip.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
-  main{max-width:860px;margin:0 auto;padding:14px 16px 220px}
-  .guide{font-size:14px;color:var(--muted);margin:2px 0 12px;line-height:1.5}
-  .sec{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}
-  .sec h2{font-size:13px;margin:0 0 6px;color:var(--accent)}
-  .txt{font-size:18px;line-height:1.85;word-break:keep-all}
-  .s{cursor:pointer;border-radius:4px;padding:1px 0;transition:background .1s}
-  .s.mine{background:var(--mine);box-shadow:inset 0 -2px 0 #e7c84a}
-  .s.pick{background:var(--pick)}
-  .panel{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--card);border-top:2px solid var(--accent);box-shadow:0 -6px 20px rgba(0,0,0,.08);padding:12px 16px 16px;transform:translateY(105%);transition:transform .2s}
-  .panel.show{transform:none}
-  .panel .inner{max-width:860px;margin:0 auto}
-  .quote{font-size:14px;background:#fff9d6;border-left:4px solid #e7c84a;padding:6px 10px;margin-bottom:8px;max-height:64px;overflow:auto}
-  label{display:block;font-size:14px;font-weight:600;margin:6px 0 4px}
-  textarea{width:100%;font-size:16px;padding:8px 10px;border:1.5px solid var(--line);border-radius:8px;resize:vertical;min-height:56px;font-family:inherit}
-  .btns{display:flex;gap:8px;margin-top:10px}
-  button.main{flex:1;background:var(--accent);color:#fff;border:0;border-radius:10px;font-size:16px;font-weight:600;padding:12px}
-  button.sub{background:#fff;border:1.5px solid var(--line);border-radius:10px;font-size:15px;padding:12px 16px}
-  button:disabled{opacity:.5}
-  .msg{font-size:14px;margin-top:6px;min-height:18px}
-  .msg.err{color:var(--danger)}
-  .mylist h3{font-size:15px;margin:22px 0 8px}
-  .item{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:15px;line-height:1.55}
-  .item .q{color:var(--muted);font-size:13px;margin-bottom:4px}
-  .item .tag{display:inline-block;font-size:12px;border-radius:6px;padding:1px 7px;color:#fff;margin-right:6px}
-  .item .del{float:right;border:0;background:none;color:var(--danger);font-size:13px;padding:4px}
-  .lock{position:fixed;inset:0;background:rgba(246,245,241,.96);z-index:20;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;font-size:18px}
-  .lock.show{display:flex}
+:root{
+  --desk:#24343a; --desk-2:#2d4148; --paper:#f3f6f3; --paper-2:#e9efeb; --ink:#1c2a2e; --ink-soft:#4f6266; --rule:#b9cbc4;
+  --stamp:#b8322a; --stamp-bg:#f6e1de; --ok:#1e7566; --ok-bg:#dcefe9; --gold:#a97a14; --gold-bg:#f5ecd2; --pick:#ffe36e;
+  --body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --display:"Nanum Myeongjo","Noto Serif KR","AppleMyungjo",serif;
+  --mono:"Nanum Gothic Coding","D2Coding",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--desk);color:var(--ink);font-family:var(--body);min-height:100vh}
+button{font-family:inherit;color:inherit}
+.top{position:sticky;top:0;z-index:20;background:var(--desk);color:#e8efec;padding:10px 16px 8px;border-bottom:1px solid #3b5158}
+.top .row1{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.code{font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:#9fb5ad}
+.title{font-family:var(--display);font-size:19px;font-weight:800}
+.me{margin-left:auto;display:flex;gap:6px;align-items:center}
+.badge{font-size:13px;font-weight:600;padding:5px 10px;border-radius:999px;background:#3b5158;border:0;cursor:pointer}
+.steps{display:flex;gap:4px;margin-top:8px;overflow-x:auto}
+.steps span{font-size:12px;padding:4px 9px;border-radius:6px;background:#2d4148;color:#9fb5ad;white-space:nowrap}
+.steps span.on{background:var(--gold);color:#fff;font-weight:700}
+.steps span.done{color:#c9d6d1}
+main{max-width:920px;margin:0 auto;padding:14px 14px 240px}
+.paper{background:var(--paper);border-radius:12px;padding:16px 18px;margin-bottom:12px;box-shadow:0 2px 0 rgba(0,0,0,.18)}
+.paper h2{font-family:var(--display);font-size:21px;margin:0 0 8px}
+.paper h3{font-size:15px;margin:14px 0 6px}
+.muted{color:var(--ink-soft);font-size:14px;line-height:1.6}
+.lead p{font-size:16.5px;line-height:1.75;margin:0 0 8px}
+.mission{display:grid;grid-template-columns:28px 1fr;gap:6px 10px;font-size:15px;line-height:1.5}
+.mission b{font-family:var(--mono);color:var(--stamp)}
+table.pts{width:100%;border-collapse:collapse;font-size:14.5px}
+table.pts td{padding:6px 4px;border-bottom:1px dashed var(--rule)}
+table.pts td:last-child{text-align:right;font-family:var(--mono);font-weight:700}
+.clue{background:var(--gold-bg);border:2px dashed var(--gold);border-radius:12px;padding:14px 16px}
+.clue .k{font-family:var(--mono);font-size:12px;color:var(--gold);letter-spacing:.06em}
+.clue .t{font-size:17px;line-height:1.65;margin-top:6px}
+.wait{text-align:center;color:#c9d6d1;font-size:15px;padding:12px}
+/* 처음 고르기 */
+.pickgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+.big{font-size:18px;font-weight:700;padding:18px 10px;border-radius:12px;border:2px solid var(--rule);background:#fff;cursor:pointer}
+.big.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.go{display:block;width:100%;margin-top:16px;padding:15px;font-size:17px;font-weight:700;border:0;border-radius:12px;background:var(--stamp);color:#fff;cursor:pointer}
+.go:disabled{opacity:.4}
+/* 탭 */
+.tabs{display:flex;gap:6px;margin-bottom:10px}
+.tabs button{flex:1;padding:11px 6px;border-radius:10px;border:0;background:var(--desk-2);color:#c9d6d1;font-size:15px;font-weight:600;cursor:pointer}
+.tabs button.on{background:var(--paper);color:var(--ink)}
+.counter{display:flex;gap:10px;align-items:center;color:#e8efec;margin:2px 0 10px;flex-wrap:wrap}
+.counter .n{font-family:var(--mono);font-size:22px;font-weight:700;color:#fff}
+.hintbtn{margin-left:auto;background:transparent;border:1.5px solid #9fb5ad;color:#e8efec;border-radius:999px;padding:7px 14px;font-size:14px;cursor:pointer}
+/* 보고서 */
+.sec{margin-bottom:14px}
+.sec .nm{font-family:var(--mono);font-size:12.5px;color:var(--ok);font-weight:700;letter-spacing:.04em;margin-bottom:3px}
+.txt{font-size:18.5px;line-height:1.9;word-break:keep-all}
+.s{cursor:pointer;border-radius:4px;padding:2px 0;-webkit-tap-highlight-color:transparent}
+.s.pick{background:var(--pick)}
+.s.hit{text-decoration:underline 3px var(--stamp);text-underline-offset:5px}
+.s.part{text-decoration:underline 2px dashed var(--gold);text-underline-offset:5px}
+.tag{display:inline-block;font-size:11.5px;font-weight:700;color:#fff;background:var(--stamp);border-radius:4px;padding:1px 6px;vertical-align:3px;margin:0 2px}
+/* 증거물 */
+.ev{border:1.5px solid var(--rule);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fff}
+.ev .h{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--ok)}
+.ev.locked{background:repeating-linear-gradient(135deg,#e3e9e6 0 8px,#edf2ef 8px 16px);color:var(--ink-soft);text-align:center;font-size:14px}
+.ev .b{font-size:16px;line-height:1.6;margin-top:3px}
+/* 기록 */
+.rec{border-left:5px solid var(--rule);background:#fff;border-radius:8px;padding:9px 12px;margin-bottom:8px;font-size:15px;line-height:1.55}
+.rec.full{border-left-color:var(--stamp)} .rec.part{border-left-color:var(--gold)}
+.rec .m{font-size:12.5px;color:var(--ink-soft)}
+/* 제출 패널 */
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--paper);border-top:4px solid var(--stamp);box-shadow:0 -10px 30px rgba(0,0,0,.35);padding:12px 16px calc(14px + env(safe-area-inset-bottom));transform:translateY(105%);transition:transform .22s;max-height:78vh;overflow:auto}
+.sheet.show{transform:none}
+.sheet .inner{max-width:920px;margin:0 auto}
+.quote{font-size:14.5px;background:#fff8cf;border-left:4px solid #e3c23d;padding:6px 10px;margin-bottom:8px;max-height:70px;overflow:auto}
+.cards{display:flex;flex-wrap:wrap;gap:6px}
+.card{border:1.5px solid var(--rule);background:#fff;border-radius:8px;padding:8px 10px;font-size:14.5px;cursor:pointer;text-align:left}
+.card.on{background:var(--stamp);border-color:var(--stamp);color:#fff;font-weight:700}
+.carddesc{font-size:13.5px;color:var(--ink-soft);min-height:20px;margin:6px 0 2px}
+label{display:block;font-size:14.5px;font-weight:700;margin:10px 0 4px}
+textarea,input[type=text]{width:100%;font-size:16px;padding:9px 11px;border:1.5px solid var(--rule);border-radius:9px;font-family:inherit;background:#fff}
+textarea{resize:vertical;min-height:58px}
+.btns{display:flex;gap:8px;margin-top:12px}
+.btn{flex:1;padding:13px;border-radius:10px;border:0;font-size:16px;font-weight:700;cursor:pointer;background:var(--ink);color:#fff}
+.btn.red{background:var(--stamp)} .btn.ghost{flex:0 0 auto;background:#fff;color:var(--ink);border:1.5px solid var(--rule)}
+.btn:disabled{opacity:.45}
+.msg{font-size:14px;min-height:20px;margin-top:6px}
+.msg.err{color:var(--stamp);font-weight:600}
+/* 판정 팝업 */
+.verdict{position:fixed;inset:0;z-index:50;background:rgba(18,28,31,.78);display:none;align-items:center;justify-content:center;padding:20px}
+.verdict.show{display:flex}
+.vbox{background:var(--paper);border-radius:16px;max-width:520px;width:100%;padding:24px 22px;text-align:center;animation:pop .28s ease-out}
+@keyframes pop{from{transform:scale(.85);opacity:0}to{transform:none;opacity:1}}
+.stampmark{display:inline-block;font-family:var(--display);font-weight:800;font-size:30px;color:var(--stamp);border:4px solid var(--stamp);border-radius:10px;padding:6px 18px;transform:rotate(-6deg);margin-bottom:12px;animation:stamp .35s ease-out}
+.stampmark.gold{color:var(--gold);border-color:var(--gold)} .stampmark.gray{color:var(--ink-soft);border-color:var(--ink-soft)}
+@keyframes stamp{from{transform:rotate(-6deg) scale(2.2);opacity:0}to{transform:rotate(-6deg) scale(1);opacity:1}}
+.vbox .t{font-size:17px;line-height:1.6}
+.vbox .ev{text-align:left;margin-top:12px;border-color:var(--ok)}
+/* 복원·심사 */
+.orig{font-size:15.5px;line-height:1.7;background:var(--paper-2);border-radius:8px;padding:10px 12px;color:var(--ink-soft)}
+.rw{font-size:17px;line-height:1.75;background:#fff;border:1.5px solid var(--ok);border-radius:8px;padding:10px 12px;white-space:pre-wrap}
+.chk{display:flex;gap:10px;align-items:center;font-size:16px;padding:10px 12px;border:1.5px solid var(--rule);border-radius:9px;margin-bottom:6px;background:#fff;cursor:pointer}
+.chk input{width:22px;height:22px}
+.ok{color:var(--ok);font-weight:700}
+.rank{display:flex;align-items:center;gap:12px;padding:12px;border-radius:10px;background:#fff;margin-bottom:8px;font-size:17px}
+.rank.me{outline:3px solid var(--gold)}
+.rank .no{font-family:var(--mono);font-size:22px;font-weight:700;width:34px}
+.rank .g{font-weight:700} .rank .gr{margin-left:auto;font-family:var(--display);font-weight:800;color:var(--stamp)}
+.foot{color:#9fb5ad;font-size:12.5px;text-align:center;margin-top:18px}
 </style>
 </head>
 <body>
-<header>
-  <h1 id="title">형광펜 의견판</h1>
-  <div class="row"><span class="label">모둠</span><div id="groups" class="row" style="margin:0"></div></div>
-  <div class="row"><span class="label">역할</span><div id="roles" class="row" style="margin:0"></div></div>
-</header>
-
-<main>
-  <p class="guide">① 모둠과 역할을 고릅니다. ② 문제가 있다고 생각하는 문장을 누릅니다(여러 문장 가능). ③ 아래 칸에 무엇이 문제인지, 어떻게 바꾸면 좋을지 적고 올립니다.</p>
-  <div id="text">불러오는 중...</div>
-  <div class="mylist"><h3 id="myhead">우리 모둠 의견</h3><div id="mine"></div></div>
-</main>
-
-<div class="panel" id="panel"><div class="inner">
-  <div class="quote" id="quote"></div>
-  <label for="problem">무엇이 문제인가요? (내 역할의 눈으로)</label>
-  <textarea id="problem" maxlength="500" placeholder="예) 출처가 '여행 블로그'라서 믿기 어렵다."></textarea>
-  <label for="fix">이렇게 바꾸자</label>
-  <textarea id="fix" maxlength="500" placeholder="예) 자료 6의 고령층 설문(62%)으로 바꾸고 위치를 적는다."></textarea>
-  <div class="btns">
-    <button class="sub" id="cancel">선택 취소</button>
-    <button class="main" id="send">의견 올리기</button>
+<div class="top">
+  <div class="row1">
+    <div><div class="code" id="code"></div><div class="title" id="title">사건파일</div></div>
+    <div class="me" id="me"></div>
   </div>
-  <div class="msg" id="msg"></div>
-</div></div>
+  <div class="steps" id="steps"></div>
+</div>
+<main id="main"><div class="wait">수사 수첩을 여는 중...</div></main>
 
-<div class="lock" id="lock">지금은 의견을 받지 않고 있어요.<br>선생님 안내를 기다려 주세요.</div>
+<div class="sheet" id="sheet"><div class="inner" id="sheetInner"></div></div>
+<div class="verdict" id="verdict"><div class="vbox" id="vbox"></div></div>
 
+<script src="common.js?v=1"></script>
 <script>
-const ROLE_COLORS = ['#2f6fb0','#7b4fa8','#c76a1c','#2f8a57','#b0405e','#4f7f8a','#8a7a2f','#555'];
-let CONF = null, COMMENTS = [], picked = new Set();
-let state = { group: null, role: null };
-try { state = Object.assign(state, JSON.parse(localStorage.getItem('hl_state') || '{}')); } catch(e) {}
+let B = null;              // boot: 글, 카드, 단서, 구역
+let S = null;              // 우리 모둠 상태
+let me = store('case_me') || { group: null, role: null };
+let picking = false;
+let tab = 'report', picked = new Set(), card = '', busy = false, editing = false;
+let draft = store('case_draft') || {};       // 복원 글 임시 저장
+let reviewSel = {};                          // 심사 화면 체크 상태
 
-const $ = id => document.getElementById(id);
-function save(){ try { localStorage.setItem('hl_state', JSON.stringify(state)); } catch(e) {} }
-function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function phase() { return S ? S.state.phase : (B ? B.state.phase : 0); }
+function sentence(k) { const [a, b] = k.split('-').map(Number); return B.sections[a] ? B.sections[a].sentences[b] : ''; }
+function secName(k) { return B.sections[Number(k.split('-')[0])]?.name || ''; }
 
-/* 서버 주소: Apps Script 웹앱 /exec 주소 */
-const API_URL = 'https://script.google.com/macros/s/AKfycbyyk05Wu6D3DUrO4F8wzG2DGzP9UUEnU8Bmi8qERaXupv2Cv9jutUMPe6v3zq-4XLIZag/exec';
-function call(fn, ...args){
-  if (API_URL && API_URL.indexOf('http') === 0) {
-    return fetch(API_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ fn, args }) })
-      .then(r => r.json())
-      .then(j => { if (!j.ok) throw j.error; return j.data; })
-      .catch(e => { throw (typeof e === 'string' ? e : '연결이 잠깐 끊겼어요. 다시 눌러 주세요.'); });
+/* ---------- 머리 ---------- */
+function renderTop() {
+  $('code').textContent = STORY.code;
+  $('title').textContent = STORY.title;
+  $('me').innerHTML = me.group ? `<button class="badge" id="change">${me.group}모둠 · ${esc(me.role)}</button>` : '';
+  $('steps').innerHTML = B.phases.map((p, i) => `<span class="${i === phase() ? 'on' : i < phase() ? 'done' : ''}">${esc(p)}</span>`).join('');
+}
+
+/* ---------- 처음: 모둠·역할 ---------- */
+function renderPick() {
+  let g = ''; for (let i = 1; i <= B.groups; i++) g += `<button class="big ${me.group === i ? 'on' : ''}" data-pg="${i}">${i}모둠</button>`;
+  $('main').innerHTML = `<div class="paper"><h2>수사관 등록</h2><p class="muted">우리 모둠 번호와 내 역할을 고르세요. 역할마다 다른 비밀 단서를 받습니다.</p>
+    <h3>모둠</h3><div class="pickgrid">${g}</div>
+    <h3>역할</h3><div class="pickgrid">${B.roles.map(r => `<button class="big ${me.role === r ? 'on' : ''}" data-pr="${esc(r)}">${esc(r)}</button>`).join('')}</div>
+    <button class="go" id="register" ${me.group && me.role ? '' : 'disabled'}>수사 수첩 열기</button></div>`;
+}
+
+/* ---------- 0 브리핑 ---------- */
+function clueHTML() {
+  return `<div class="clue"><div class="k">TOP SECRET · ${esc(me.role)} 수사관에게만</div><div class="t">${esc(B.clues[me.role] || '')}</div></div>`;
+}
+function renderBrief() {
+  $('main').innerHTML = `<div class="paper lead"><div class="code" style="color:var(--stamp)">${STORY.code}</div><h2>${STORY.title}</h2>${STORY.lead.map(p => `<p>${esc(p)}</p>`).join('')}</div>
+    <div class="paper"><h2>네 가지 임무</h2><div class="mission">${STORY.missions.map((m, i) => `<b>0${i + 1}</b><div><strong>${esc(m[0])}</strong> ${esc(m[1])}</div>`).join('')}</div></div>
+    <div class="paper"><h2>내 비밀 단서</h2>${clueHTML()}<p class="muted" style="margin-top:8px">단서는 모둠 친구들에게 말로 알려 줘도 됩니다. 단, 화면을 보여 주지는 마세요.</p></div>
+    <div class="paper"><h2>점수 규칙</h2><table class="pts">${STORY.points.map(p => `<tr><td>${esc(p[0])}</td><td>${p[1]}</td></tr>`).join('')}</table><p class="muted">${esc(STORY.note)}</p></div>
+    <div class="wait">선생님이 수사를 시작하면 화면이 저절로 바뀝니다.</div>`;
+}
+
+/* ---------- 1 결함 수사 ---------- */
+function foundByKey() {
+  const m = {};
+  (S.found || []).forEach(f => f.keys.forEach(k => { (m[k] = m[k] || []).push(f); }));
+  return m;
+}
+function renderFind() {
+  const full = S.found.filter(f => f.kind === 'full').length;
+  const ev = S.data.filter(d => !d.locked).length;
+  let body = '';
+  if (tab === 'report') {
+    const fk = foundByKey();
+    body = `<div class="paper"><p class="muted" style="margin-top:0">결함이 있다고 생각하는 문장을 누르세요. 여러 문장을 함께 고를 수 있어요.</p>` +
+      B.sections.map((sec, si) => `<div class="sec"><div class="nm">${esc(sec.name)}</div><div class="txt">` +
+        sec.sentences.map((s, j) => {
+          const k = si + '-' + j, fs = fk[k] || [];
+          const isFull = fs.some(f => f.kind === 'full'), isPart = !isFull && fs.length;
+          const tags = fs.filter(f => f.kind === 'full').map(f => `<span class="tag">${esc(f.card)}</span>`).join('');
+          return `<span class="s ${picked.has(k) ? 'pick' : ''} ${isFull ? 'hit' : isPart ? 'part' : ''}" data-k="${k}">${esc(s)}</span>${tags} `;
+        }).join('') + `</div></div>`).join('') + `</div>`;
+  } else if (tab === 'evidence') {
+    body = `<div class="paper"><h2>증거물 보관함</h2><p class="muted">결함을 찾으면 관련 증거물이 열립니다. 2라운드가 시작되면 모두 열려요.</p>` +
+      S.data.map(d => d.locked ? `<div class="ev locked">🔒 ${esc(d.name)} · ${esc(d.loc || '')} · 아직 확보하지 못한 증거물</div>`
+        : `<div class="ev"><div class="h">${esc(d.name)} · ${esc(d.loc)}</div><div class="b">${esc(d.text)}</div></div>`).join('') + `</div>`;
+  } else {
+    body = `<div class="paper"><h2>우리 모둠 수사 기록</h2>` +
+      (S.hints.length ? `<h3>사용한 힌트</h3>${S.hints.map(h => `<div class="rec">💡 ${esc(h.text)}</div>`).join('')}` : '') +
+      `<h3>제출한 의견 ${S.finds.length}개</h3>` +
+      (S.finds.map(f => `<div class="rec ${f.result}"><div class="m">${esc(f.role)} · ${esc(f.card)} · ${f.result === 'full' ? '결함 발견' : f.result === 'part' ? '문장만 맞음' : '기록됨'}</div>
+        <div class="m">“${esc(f.quote.length > 70 ? f.quote.slice(0, 70) + '…' : f.quote)}”</div><div><b>문제</b> ${esc(f.problem)}</div><div><b>바꾸자</b> ${esc(f.fix)}</div></div>`).join('') || '<p class="muted">아직 없어요.</p>') + `</div>`;
   }
-  return new Promise((res, rej) => {
-    if (window.google && google.script && google.script.run) {
-      google.script.run.withSuccessHandler(res).withFailureHandler(e => rej(e && e.message ? e.message : String(e)))[fn](...args);
-    } else { Promise.resolve().then(() => res(MOCK[fn](...args))).catch(e => rej(e.message)); }
-  });
+  $('main').innerHTML = `<div class="counter"><span>우리 모둠 확보 결함</span><span class="n">${full} / ${B.flawCount}</span><span>· 증거물 ${ev} / ${S.data.length}</span>
+      <button class="hintbtn" id="hint">💡 힌트 (−${B.hintCost})</button></div>
+    <div class="tabs"><button data-tab="report" class="${tab === 'report' ? 'on' : ''}">보고서</button><button data-tab="evidence" class="${tab === 'evidence' ? 'on' : ''}">증거물</button><button data-tab="log" class="${tab === 'log' ? 'on' : ''}">수사 기록</button><button data-tab="clue">내 단서</button></div>${body}`;
+  renderFindSheet();
 }
-
-function renderTop(){
-  $('title').textContent = CONF.title || '형광펜 의견판';
-  let g = '';
-  for (let i = 1; i <= CONF.groups; i++) g += `<button class="chip ${state.group===i?'on':''}" data-g="${i}">${i}모둠</button>`;
-  $('groups').innerHTML = g;
-  $('roles').innerHTML = CONF.roles.map(r => `<button class="chip ${state.role===r?'on':''}" data-r="${esc(r)}">${esc(r)}</button>`).join('');
-  $('lock').classList.toggle('show', !CONF.open);
-}
-
-function renderText(){
-  const mineKeys = new Set();
-  COMMENTS.filter(c => c.group === state.group).forEach(c => c.keys.forEach(k => mineKeys.add(k)));
-  $('text').innerHTML = CONF.sections.map((sec, si) =>
-    `<div class="sec"><h2>${esc(sec.name)}</h2><div class="txt">` +
-    sec.sentences.map((s, j) => {
-      const k = si + '-' + j;
-      return `<span class="s ${picked.has(k)?'pick':''} ${mineKeys.has(k)?'mine':''}" data-k="${k}">${esc(s)}</span> `;
-    }).join('') + `</div></div>`).join('');
-}
-
-function sentenceOf(k){ const [a,b] = k.split('-').map(Number); return CONF.sections[a] ? CONF.sections[a].sentences[b] : ''; }
-function sectionOf(k){ const a = Number(k.split('-')[0]); return CONF.sections[a] ? CONF.sections[a].name : ''; }
-function sortKeys(arr){ return arr.sort((x,y)=>{const [a,b]=x.split('-').map(Number),[c,d]=y.split('-').map(Number);return a-c||b-d;}); }
-
-function renderPanel(){
-  const show = picked.size > 0;
-  $('panel').classList.toggle('show', show);
+function renderFindSheet() {
+  const show = phase() === 1 && tab === 'report' && picked.size > 0;
+  $('sheet').classList.toggle('show', show);
   if (!show) return;
-  const keys = sortKeys([...picked]);
-  $('quote').innerHTML = keys.map(k => `<b>[${esc(sectionOf(k))}]</b> ${esc(sentenceOf(k))}`).join('<br>');
+  if ($('sheetInner').dataset.mode === 'find' && editing) {           // 입력 중이면 인용만 갱신
+    $('quote').innerHTML = quoteHTML(); return;
+  }
+  const keepP = $('problem')?.value || '', keepF = $('fix')?.value || '';
+  $('sheetInner').dataset.mode = 'find';
+  $('sheetInner').innerHTML = `<div class="quote" id="quote">${quoteHTML()}</div>
+    <label>결함 이름 고르기</label><div class="cards">${B.cards.map(c => `<button class="card ${card === c.name ? 'on' : ''}" data-card="${esc(c.name)}">${esc(c.name)}</button>`).join('')}</div>
+    <div class="carddesc" id="carddesc">${esc(B.cards.find(c => c.name === card)?.desc || '카드를 누르면 뜻이 보여요.')}</div>
+    <label for="problem">무엇이 문제인가? (${esc(me.role)}의 눈으로)</label><textarea id="problem" maxlength="500" placeholder="예) 70%가 어디서 나온 수치인지 믿을 수 없다.">${esc(keepP)}</textarea>
+    <label for="fix">이렇게 바꾸자</label><textarea id="fix" maxlength="500" placeholder="예) 자료 6 · 2번째 문단의 고령층 설문으로 바꾼다.">${esc(keepF)}</textarea>
+    <div class="btns"><button class="btn ghost" id="cancel">선택 취소</button><button class="btn red" id="submitFind">수사 결과 제출</button></div><div class="msg" id="msg"></div>`;
+}
+function quoteHTML() { return sortKeys([...picked]).map(k => `<b>[${esc(secName(k))}]</b> ${esc(sentence(k))}`).join('<br>'); }
+
+function showVerdict(r) {
+  let h = '';
+  if (r.msg === 'full') {
+    h = `<div class="stampmark">결함 발견</div><div class="t"><b>${esc(r.section)}</b>에서 「<b>${esc(r.card)}</b>」 결함을 찾았다!${r.roleHit ? '<br><span class="ok">내 역할 담당 결함이다. 보너스 +1</span>' : ''}</div>` +
+      (r.evidence ? `<div class="ev"><div class="h">🔓 증거물 확보 · ${esc(r.evidence.name)} · ${esc(r.evidence.loc)}</div><div class="b">${esc(r.evidence.text)}</div></div>` : '');
+  } else if (r.msg === 'part') {
+    h = `<div class="stampmark gold">아깝다</div><div class="t">문장은 맞았다! 이 문장에는 결함이 숨어 있다.<br>그런데 결함 이름이 다르다. 이 결함에 남은 기회는 한 번 더 있다.</div>`;
+  } else if (r.msg === 'already') {
+    h = `<div class="stampmark gray">확보 완료</div><div class="t">이미 우리 모둠이 찾은 결함이다. 다른 곳을 수사하자.</div>`;
+  } else if (r.msg === 'locked' || r.msg === 'late') {
+    h = `<div class="stampmark gray">기회 종료</div><div class="t">이 결함은 기회를 다 썼다. (+1은 그대로 남는다)</div>`;
+  } else {
+    h = `<div class="stampmark gray">기록됨</div><div class="t">이 문장에서는 숨은 결함이 나오지 않았다.<br>의견은 수사 기록에 남았다.</div>`;
+  }
+  $('vbox').innerHTML = h + `<div class="btns"><button class="btn" id="closeV">계속 수사하기</button></div>`;
+  $('verdict').classList.add('show');
 }
 
-function renderMine(){
-  const roleIdx = r => Math.max(0, CONF.roles.indexOf(r));
-  const list = COMMENTS.filter(c => c.group === state.group).sort((a,b)=>b.time-a.time);
-  $('myhead').textContent = state.group ? `${state.group}모둠 의견 (${list.length})` : '우리 모둠 의견';
-  $('mine').innerHTML = !state.group ? '<p class="guide">모둠을 고르면 우리 모둠이 올린 의견이 여기 보여요.</p>' :
-    (list.length ? '' : '<p class="guide">아직 올린 의견이 없어요.</p>') +
-    list.map(c => `<div class="item"><button class="del" data-id="${esc(c.id)}">지우기</button>
-      <span class="tag" style="background:${ROLE_COLORS[roleIdx(c.role)%8]}">${esc(c.role)}</span>
-      <div class="q">${esc(c.keys.map(sectionOf).filter((v,i,a)=>a.indexOf(v)===i).join(', '))} · ${esc(c.quote).slice(0,80)}${c.quote.length>80?'…':''}</div>
-      <div><b>문제:</b> ${esc(c.problem)}</div><div><b>바꾸자:</b> ${esc(c.fix)}</div></div>`).join('');
+/* ---------- 2 보고서 복원 ---------- */
+function myZone() { return B.zones[me.group] || B.zones[String(me.group)] || []; }
+function renderRewrite() {
+  const zone = myZone();
+  const saved = (S.rewrites[me.group] || {});
+  const secs = B.sections.filter(s => zone.indexOf(s.name) >= 0);
+  $('main').innerHTML = `<div class="paper"><h2>보고서 복원 · ${me.group}모둠 담당: ${esc(zone.join(', '))}</h2>
+      <p class="muted">원문을 지우고 다시 써도 되고, 고칠 부분만 바꿔도 됩니다. 증거물(자료)을 쓸 때는 "자료 번호 · 몇 번째 문단"을 꼭 적으세요. 한 사람이 대표로 저장하면 모둠 전체에 반영됩니다.</p></div>` +
+    secs.map(s => {
+      const sv = saved[s.name];
+      const val = draft[s.name] != null ? draft[s.name] : (sv ? sv.text : s.sentences.join(' '));
+      return `<div class="paper"><h3 style="margin-top:0">${esc(s.name)} ${sv ? `<span class="ok">· 저장됨 (${esc(sv.role)})</span>` : ''}</h3>
+        <div class="orig">${esc(s.sentences.join(' '))}</div>
+        <label>고쳐 쓴 글</label><textarea data-rw="${esc(s.name)}" style="min-height:180px">${esc(val)}</textarea>
+        ${sv && draft[s.name] != null && draft[s.name] !== sv.text ? `<button class="btn ghost" data-load="${esc(s.name)}" style="margin-top:6px">모둠이 저장한 글 불러오기</button>` : ''}</div>`;
+    }).join('') +
+    `<div class="paper"><div class="btns" style="margin-top:0"><button class="btn red" id="saveRw">모둠 글 저장</button></div><div class="msg" id="msg"></div></div>
+     <div class="paper"><h2>증거물 보관함</h2>${S.data.map(d => `<div class="ev"><div class="h">${esc(d.name)} · ${esc(d.loc)}</div><div class="b">${esc(d.text)}</div></div>`).join('')}</div>
+     <div class="paper"><h2>우리 모둠이 찾은 결함</h2>${S.found.filter(f => f.kind === 'full').map(f => `<div class="rec full"><b>${esc(f.section)}</b> · ${esc(f.card)}</div>`).join('') || '<p class="muted">없음</p>'}</div>`;
 }
 
-function renderAll(){ renderTop(); renderText(); renderPanel(); renderMine(); }
+/* ---------- 3 상호 심사 ---------- */
+function renderReview() {
+  const targets = []; for (let g = 1; g <= B.groups; g++) if (g !== me.group) targets.push(g);
+  $('main').innerHTML = `<div class="paper"><h2>상호 심사</h2><p class="muted">다른 수사팀의 복원본을 읽고, 맞는 기준에 체크하세요. 체크 1개마다 그 모둠에 +1점. 모둠 안에서 의논한 뒤 대표 한 명이 제출하세요. 다시 제출하면 마지막 것만 반영돼요.</p></div>` +
+    targets.map(t => {
+      const zone = B.zones[t] || B.zones[String(t)] || [];
+      const rw = (S.rewrites[t] || {});
+      const done = S.reviews[t];
+      const sel = reviewSel[t] || (done ? done.checks.map(Number) : []);
+      return `<div class="paper"><h2>${t}모둠 복원본 ${done ? '<span class="ok" style="font-size:15px">· 심사 완료</span>' : ''}</h2>` +
+        zone.map(n => { const s = B.sections.find(x => x.name === n); return `<h3>${esc(n)}</h3><div class="orig">원문: ${esc(s ? s.sentences.join(' ') : '')}</div><div class="rw" style="margin-top:6px">${rw[n] ? esc(rw[n].text) : '(아직 저장된 글이 없어요)'}</div>`; }).join('') +
+        `<h3>심사 기준</h3>${B.reviewChecks.map((c, i) => `<label class="chk"><input type="checkbox" data-rv="${t}" data-i="${i}" ${sel.indexOf(i) >= 0 ? 'checked' : ''}> ${esc(c)}</label>`).join('')}
+         <label>한 줄 평</label><input type="text" id="cm${t}" maxlength="300" value="${esc(done ? done.comment : '')}" placeholder="예) 자료 6을 써서 블로그 문제가 해결됐다.">
+         <div class="btns"><button class="btn red" data-sendrv="${t}">${t}모둠 심사 제출</button></div><div class="msg" id="msg${t}"></div></div>`;
+    }).join('');
+}
 
-function setMsg(t, err){ $('msg').textContent = t; $('msg').className = 'msg' + (err ? ' err' : ''); }
+/* ---------- 4 내 초안 수사 ---------- */
+function renderSelf() {
+  $('main').innerHTML = `<div class="paper"><h2>내 초안 수사</h2><p class="muted">우리 반이 찾아낸 결함 목록입니다. 내 초안을 펴 놓고, 나에게도 있는 결함을 하나 골라 어디에 있는지, 어떻게 고칠지 적으세요. 여러 번 제출해도 돼요.</p>
+      <div class="cards">${S.foundCards.map(c => `<button class="card ${card === c.name ? 'on' : ''}" data-card="${esc(c.name)}" style="${c.found ? '' : 'opacity:.55'}">${c.found ? '★ ' : ''}${esc(c.name)}</button>`).join('')}</div>
+      <div class="carddesc" id="carddesc">${esc(B.cards.find(c => c.name === card)?.desc || '★는 오늘 우리 반이 보고서에서 찾아낸 결함이에요.')}</div>
+      <label for="where">내 초안의 어디에? (구간과 문장)</label><input type="text" id="where" maxlength="300" placeholder="예) 본론2 마지막 문장">
+      <label for="plan">어떻게 고칠까?</label><textarea id="plan" maxlength="400" placeholder="예) 공사 기간 말고 운영 뒤의 생태 피해를 한계로 인정하고, 자료 2를 쓴다."></textarea>
+      <div class="btns"><button class="btn red" id="sendSelf">내 수사 결과 제출</button></div><div class="msg" id="msg"></div></div>
+    <div class="paper"><h2>우리 모둠 제출 ${S.selfs.length}개</h2>${S.selfs.map(x => `<div class="rec"><div class="m">${esc(x.role)} · ${esc(x.card)}</div><div><b>어디</b> ${esc(x.problem)}</div><div><b>고칠 계획</b> ${esc(x.fix)}</div></div>`).join('') || '<p class="muted">아직 없어요.</p>'}</div>`;
+}
 
+/* ---------- 5 결과 ---------- */
+function renderResult() {
+  if (!S.result) { $('main').innerHTML = `<div class="paper" style="text-align:center"><div class="stampmark gray">수사 종료</div><p class="t">결과 발표를 기다려 주세요. 칠판을 보세요!</p></div>`; return; }
+  const R = S.result;
+  const mine = R.rank.find(r => r.group === me.group);
+  $('main').innerHTML = `<div class="paper" style="text-align:center"><div class="stampmark">사건 해결</div>
+      ${mine ? `<p style="font-size:18px">${me.group}모둠은 <b>${mine.total}점</b> · <b style="color:var(--stamp)">${esc(mine.grade)}</b></p>` : ''}</div>
+    <div class="paper"><h2>최종 순위</h2>${R.rank.map((r, i) => `<div class="rank ${r.group === me.group ? 'me' : ''}"><span class="no">${i + 1}</span><span class="g">${r.group}모둠</span><span>${r.total}점 · 결함 ${r.flawsFound}개</span><span class="gr">${esc(r.grade)}</span></div>`).join('')}</div>
+    <div class="paper"><h2>복원된 보고서</h2>${R.restored.map(s => `<h3>${esc(s.name)} ${s.by ? `<span class="ok">· ${s.by}모둠 복원</span>` : ''}</h3><div class="rw">${esc(s.text)}</div>`).join('')}</div>
+    <div class="paper"><h2>숨은 결함 9개 해설</h2>${R.flaws.map(f => `<div class="rec full"><div class="m">${esc(f.section)} · ${esc(f.card)}</div>${esc(f.note)}</div>`).join('')}</div>`;
+}
+
+/* ---------- 전체 그리기 ---------- */
+function render() {
+  if (!B) return;
+  renderTop();
+  if (!me.group || !me.role || picking) { $('sheet').classList.remove('show'); return renderPick(); }
+  if (!S) return;
+  const p = phase();
+  if (p !== 1) $('sheet').classList.remove('show');
+  if (tab === 'clue' && p === 1) { $('main').innerHTML = `<div class="tabs"><button data-tab="report">보고서</button><button data-tab="evidence">증거물</button><button data-tab="log">수사 기록</button><button data-tab="clue" class="on">내 단서</button></div><div class="paper"><h2>내 비밀 단서</h2>${clueHTML()}</div>`; return; }
+  [renderBrief, renderFind, renderRewrite, renderReview, renderSelf, renderResult][p]();
+}
+
+/* 입력 중에는 화면을 다시 그리지 않음 */
+function typing() { const a = document.activeElement; return a && (a.tagName === 'TEXTAREA' || a.tagName === 'INPUT'); }
+
+let lastSig = '';
+function poll(force) {
+  if (!me.group) return Promise.resolve();
+  return call('state', me.group).then(st => {
+    const sig = JSON.stringify(st);
+    const phaseChanged = !S || S.state.phase !== st.state.phase;
+    S = st;
+    if (phaseChanged) { picked.clear(); card = ''; tab = 'report'; window.scrollTo(0, 0); }
+    if (force || phaseChanged || (sig !== lastSig && !typing())) render();
+    lastSig = sig;
+  }).catch(() => {});
+}
+
+function setMsg(id, t, err) { const m = $(id); if (m) { m.textContent = t; m.className = 'msg' + (err ? ' err' : ''); } }
+
+/* ---------- 클릭 ---------- */
 document.addEventListener('click', e => {
-  const g = e.target.closest('[data-g]'); if (g){ state.group = Number(g.dataset.g); save(); renderAll(); return; }
-  const r = e.target.closest('[data-r]'); if (r){ state.role = r.dataset.r; save(); renderTop(); return; }
-  const s = e.target.closest('.s'); if (s){ const k = s.dataset.k; picked.has(k) ? picked.delete(k) : picked.add(k); setMsg(''); renderText(); renderPanel(); return; }
-  const d = e.target.closest('.del');
-  if (d){
-    if (!confirmInline(d)) return;
-    call('deleteComment', d.dataset.id, state.group).then(refresh).catch(err => alertBox(err));
+  const t = e.target;
+  const pg = t.closest('[data-pg]'); if (pg) { me.group = Number(pg.dataset.pg); return renderPick(); }
+  const pr = t.closest('[data-pr]'); if (pr) { me.role = pr.dataset.pr; return renderPick(); }
+  if (t.id === 'register') { picking = false; store('case_me', me); S = null; lastSig = ''; render(); return poll(true); }
+  if (t.id === 'change') { if (confirm2(t, '다시 누르면 모둠·역할을 바꿔요')) { picking = true; render(); } return; }
+  const tb = t.closest('[data-tab]'); if (tb) { tab = tb.dataset.tab; render(); return; }
+  const s = t.closest('.s'); if (s && phase() === 1) { const k = s.dataset.k; picked.has(k) ? picked.delete(k) : picked.add(k); editing = !!($('problem')?.value || $('fix')?.value); render(); return; }
+  const cd = t.closest('[data-card]'); if (cd) {
+    card = cd.dataset.card;
+    document.querySelectorAll('[data-card]').forEach(b => b.classList.toggle('on', b.dataset.card === card));
+    const d = $('carddesc'); if (d) d.textContent = B.cards.find(c => c.name === card)?.desc || '';
+    return;
+  }
+  if (t.id === 'cancel') { picked.clear(); editing = false; $('sheetInner').dataset.mode = ''; render(); return; }
+  if (t.id === 'closeV') { $('verdict').classList.remove('show'); return; }
+  if (t.id === 'hint') {
+    if (!confirm2(t, `한 번 더 누르면 힌트 (−${B.hintCost}점)`)) return;
+    t.disabled = true;
+    call('useHint', { group: me.group, role: me.role }).then(r => {
+      $('vbox').innerHTML = `<div class="stampmark gold">힌트</div><div class="t">${esc(r.text)}</div><div class="btns"><button class="btn" id="closeV">확인</button></div>`;
+      $('verdict').classList.add('show'); return poll(true);
+    }).catch(err => { $('vbox').innerHTML = `<div class="t">${esc(err)}</div><div class="btns"><button class="btn" id="closeV">확인</button></div>`; $('verdict').classList.add('show'); });
+    return;
+  }
+  if (t.id === 'submitFind') {
+    if (busy) return;
+    if (!card) return setMsg('msg', '결함 이름 카드를 하나 골라 주세요.', true);
+    busy = true; t.disabled = true; setMsg('msg', '판정 중...');
+    call('submitFind', { group: me.group, role: me.role, keys: sortKeys([...picked]), card, problem: $('problem').value, fix: $('fix').value })
+      .then(r => { picked.clear(); card = ''; editing = false; $('sheetInner').dataset.mode = ''; $('sheetInner').innerHTML = ''; showVerdict(r); return poll(true); })
+      .catch(err => setMsg('msg', err, true))
+      .finally(() => { busy = false; t.disabled = false; });
+    return;
+  }
+  const ld = t.closest('[data-load]'); if (ld) { delete draft[ld.dataset.load]; store('case_draft', draft); render(); return; }
+  if (t.id === 'saveRw') {
+    const parts = [...document.querySelectorAll('[data-rw]')].map(a => ({ section: a.dataset.rw, text: a.value }));
+    t.disabled = true; setMsg('msg', '저장 중...');
+    call('saveRewrite', { group: me.group, role: me.role, parts })
+      .then(() => { parts.forEach(p => delete draft[p.section]); store('case_draft', draft); setMsg('msg', '모둠 글로 저장했어요.'); return poll(true); })
+      .catch(err => setMsg('msg', err, true)).finally(() => { t.disabled = false; });
+    return;
+  }
+  const sr = t.closest('[data-sendrv]'); if (sr) {
+    const tg = Number(sr.dataset.sendrv);
+    const checks = [...document.querySelectorAll(`[data-rv="${tg}"]`)].filter(x => x.checked).map(x => Number(x.dataset.i));
+    sr.disabled = true; setMsg('msg' + tg, '제출 중...');
+    call('submitReview', { group: me.group, role: me.role, target: tg, checks, comment: $('cm' + tg).value })
+      .then(() => { delete reviewSel[tg]; setMsg('msg' + tg, '심사를 제출했어요.'); return poll(true); })
+      .catch(err => setMsg('msg' + tg, err, true)).finally(() => { sr.disabled = false; });
+    return;
+  }
+  if (t.id === 'sendSelf') {
+    if (!card) return setMsg('msg', '결함 카드를 하나 골라 주세요.', true);
+    t.disabled = true; setMsg('msg', '제출 중...');
+    call('submitSelf', { group: me.group, role: me.role, card, where: $('where').value, plan: $('plan').value })
+      .then(() => { card = ''; return poll(true); })
+      .catch(err => setMsg('msg', err, true)).finally(() => { t.disabled = false; });
+    return;
   }
 });
+document.addEventListener('change', e => {
+  const rv = e.target.closest('[data-rv]');
+  if (rv) { const tg = Number(rv.dataset.rv); reviewSel[tg] = [...document.querySelectorAll(`[data-rv="${tg}"]`)].filter(x => x.checked).map(x => Number(x.dataset.i)); }
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'problem' || e.target.id === 'fix') editing = true;
+  if (e.target.dataset && e.target.dataset.rw) { draft[e.target.dataset.rw] = e.target.value; store('case_draft', draft); }
+});
 
-/* 지우기는 두 번 눌러야 실행 (실수 방지, 팝업 없이) */
-function confirmInline(btn){
-  if (btn.dataset.armed){ return true; }
-  btn.dataset.armed = '1'; btn.textContent = '한 번 더 누르면 지워져요';
-  setTimeout(() => { if (btn.isConnected){ delete btn.dataset.armed; btn.textContent = '지우기'; } }, 3000);
+/* 팝업 대신 두 번 누르기 */
+function confirm2(btn, label) {
+  if (btn.dataset.armed) return true;
+  const old = btn.textContent; btn.dataset.armed = '1'; btn.textContent = label;
+  setTimeout(() => { if (btn.isConnected) { delete btn.dataset.armed; btn.textContent = old; } }, 3000);
   return false;
 }
-function alertBox(t){ setMsg(String(t), true); }
 
-$('cancel').onclick = () => { picked.clear(); setMsg(''); renderText(); renderPanel(); };
-$('send').onclick = () => {
-  if (!state.group) return setMsg('위에서 모둠을 먼저 골라 주세요.', true);
-  if (!state.role) return setMsg('위에서 역할을 먼저 골라 주세요.', true);
-  const problem = $('problem').value.trim(), fix = $('fix').value.trim();
-  if (!problem || !fix) return setMsg('문제점과 바꿀 방법을 모두 적어 주세요.', true);
-  const keys = sortKeys([...picked]);
-  const quote = keys.map(sentenceOf).join(' ');
-  $('send').disabled = true; setMsg('올리는 중...');
-  call('addComment', { group: state.group, role: state.role, keys, quote, problem, fix })
-    .then(() => { $('problem').value = ''; $('fix').value = ''; picked.clear(); setMsg('올렸어요.'); return refresh(); })
-    .catch(err => setMsg(err, true))
-    .finally(() => { $('send').disabled = false; });
-};
-
-function refresh(){
-  return call('getComments').then(c => { COMMENTS = c; renderText(); renderMine(); renderPanel(); });
+/* ---------- 시작 ---------- */
+function start() {
+  call('boot').then(b => {
+    B = b;
+    if (me.group > B.groups) me.group = null;
+    if (me.role && B.roles.indexOf(me.role) < 0) me.role = null;
+    render(); return poll(true);
+  }).catch(err => { $('main').innerHTML = `<div class="paper"><h2>연결하지 못했어요</h2><p class="muted">${esc(err)}</p><button class="go" onclick="location.reload()">다시 시도</button></div>`; });
 }
-
-function boot(){
-  call('getConfig').then(conf => {
-    CONF = conf;
-    if (state.group && state.group > CONF.groups) state.group = null;
-    if (state.role && CONF.roles.indexOf(state.role) < 0) state.role = null;
-    renderAll(); return refresh();
-  }).catch(err => { $('text').textContent = '불러오지 못했어요: ' + err; });
-}
-setInterval(() => { if (CONF) call('getConfig').then(c => { CONF.open = c.open; $('lock').classList.toggle('show', !c.open); }).catch(()=>{}); }, 20000);
-
-/* ---- 연습용 가짜 서버 (구글 밖에서 열었을 때만) ---- */
-const MOCK = (() => {
-  let store = [];
-  return {
-    getConfig: () => ({ title:'예시 논증문 A (연습 화면)', groups:6, roles:['팩트체크','윤리·공정','현실·실행','환경·미래'], open:true,
-      sections:[{name:'탐구 질문',sentences:['환경공학자의 시선에서, 설악산 오색 케이블카는 설치되어야 하는가?']},
-                {name:'본론 1',sentences:['케이블카가 필요한 가장 큰 이유는 접근성이다.','어떤 여행 블로그에 따르면 케이블카 설치를 원하는 사람이 70%나 된다고 한다.']}]}),
-    getComments: () => store.slice(),
-    addComment: c => { store.push(Object.assign({id:Math.random().toString(36).slice(2,8),time:Date.now()},c)); return 'ok'; },
-    deleteComment: (id,g) => { store = store.filter(c => !(c.id===id && c.group===g)); return true; }
-  };
-})();
-boot();
+setInterval(() => { if (B && document.visibilityState === 'visible') poll(false); }, 5000);
+start();
 </script>
 </body>
 </html>
