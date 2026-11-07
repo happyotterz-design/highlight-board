@@ -232,10 +232,23 @@ function sections0_() {
 }
 
 function flaws_() { return cached_('flaws', flaws0_); }
+/* 2라운드 고쳐 쓰기용 예시 단어 (결함 탭 8번째 칸 '예시 단어'가 있으면 그걸 씀) */
+const FLAW_WORDS = {
+  'A1': '어떤 기준으로, 어떤 조건에서, 함께 지키려면, 운영되어야 하는가, 접근권과 생태 보전',
+  'A2': '반면, 산양 서식지, 산양 흔적, 해마다 100건 이상, (자료 1 · 5번째 문단)',
+  'B-b': '(자료 1 · 2번째 문단), 약 50만 명, 1,000억 원 이상',
+  'B-c': '이 수치는, 을/를 보여 준다, 환경공학자에게, 라는 의미가 있다, 왜냐하면',
+  'B-a': '자료 6 · 2번째 문단에 따르면, 고령층 응답자의 62%, 정상 경관을 포기',
+  'C1': '환경공학자로서, 생태 보전 기준, 다만, 조건이 먼저 필요하다, 아고산대 식생',
+  'C2': '물론, 한계가 있다, 정상 방향 탐방로, 갈 수 없다, 회복에 수십 년, 그럼에도, 보완할 수 있다',
+  'C3': '의무로, 10%, 생태 복원 기금, 의무 적립, 관람 구역, 과태료, 조례로 정한다',
+  'A3': '조건이 지켜질 때에만, 함께 이룰 수 있다, 환경공학자로서 나는, 가장 중요하게 생각한다'
+};
 function flaws0_() {
   return rows_(SH.FLAW).filter(r => r[0]).map(r => ({
     code: String(r[0]).trim(), section: String(r[1]), keys: keyStr_(r[2]).split(',').map(s => s.trim()).filter(Boolean),
-    card: String(r[3]).trim(), role: String(r[4]).trim(), evidence: String(r[5]).trim(), note: String(r[6])
+    card: String(r[3]).trim(), role: String(r[4]).trim(), evidence: String(r[5]).trim(), note: String(r[6]),
+    words: String((r[7] != null && String(r[7]).trim()) ? r[7] : (FLAW_WORDS[String(r[0]).trim()] || '')).split(',').map(x => x.trim()).filter(Boolean)
   }));
 }
 
@@ -398,7 +411,7 @@ function studentState(group) {
     lines: myLines,
     review: st.phase >= 3 ? { target, changes: changes_(lines_(log, target)), mine: myR, comment: allC ? allC.problem : '', got: gotR } : null,
     selfs: mine.filter(e => e.type === 'self').map(e => ({ role: e.role, card: e.card, problem: e.problem, fix: e.fix })),
-    allFlaws: st.phase >= 2 ? flaws.map(f => ({ code: f.code, card: f.card, note: f.note, evidence: f.evidence, keys: f.keys, role: f.role, found: !!(found[f.code] && found[f.code].kind === 'full') })) : [],
+    allFlaws: st.phase >= 2 ? flaws.map(f => ({ code: f.code, card: f.card, note: f.note, evidence: f.evidence, keys: f.keys, role: f.role, words: f.words || [], found: !!(found[f.code] && found[f.code].kind === 'full') })) : [],
     foundCards: st.phase >= 4 ? classCards_(log, flaws) : [],
     result: st.phase >= 5 && st.reveal ? resultPack_(log, flaws, conf) : null
   };

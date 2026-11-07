@@ -121,6 +121,7 @@ textarea{resize:vertical;min-height:58px}
 .chipsec{font-size:12px;font-weight:700;color:var(--ok);align-self:center;margin:0 2px 0 8px}
 .chipsec:first-child{margin-left:0}
 .rw .wipt{background:#fff1a8}
+.wchip{font-size:14px;padding:6px 10px;background:#fff8e6;border-color:#e7c84a}
 .reldata{margin-top:10px;padding:10px;border-radius:10px;background:var(--ok-bg)}
 .stepbox{border:2px solid var(--ink);border-radius:12px;padding:12px;background:#fff}
 .stepbox .m{font-size:13px;color:var(--ink-soft)}
@@ -151,7 +152,7 @@ textarea{resize:vertical;min-height:58px}
 <div class="sheet" id="sheet"><div class="inner" id="sheetInner"></div></div>
 <div class="verdict" id="verdict"><div class="vbox" id="vbox"></div></div>
 
-<script src="common.js?v=6"></script>
+<script src="common.js?v=7"></script>
 <script>
 let B = null;              // boot: 글, 카드, 단서, 구역
 let S = null;              // 우리 모둠 상태
@@ -332,7 +333,7 @@ function renderRewrite() {
       <div class="stepbox">
         <div class="m"><b>${esc(it.sec)}</b> · ${at >= 0 ? `${at + 1} / ${list.length}` : ''} ${it.added ? '· 새로 넣는 문장' : ''}</div>
         ${it.added ? '' : `<div class="orig"><b>원문</b> ${esc(it.orig)}</div>`}
-        ${tags.map(f => `<div class="rec ${f.found ? 'full' : 'part'}" style="margin:6px 0 0"><div class="m"><b>${esc(f.card)}</b> · 담당 ${esc(f.role)}${f.found ? ' · ✔ 우리 모둠이 찾음' : ' · 이제 공개'}${f.evidence ? ` · 추천 ${esc(dataLabel(f.evidence))}` : ''}</div>${esc(f.note)}</div>`).join('')}
+        ${tags.map(f => `<div class="rec ${f.found ? 'full' : 'part'}" style="margin:6px 0 0"><div class="m"><b>${esc(f.card)}</b> · 담당 ${esc(f.role)}${f.found ? ' · ✔ 우리 모둠이 찾음' : ' · 이제 공개'}${f.evidence ? ` · 추천 ${esc(dataLabel(f.evidence))}` : ''}</div>${esc(f.note)}${(f.words || []).length ? `<div class="m" style="margin-top:6px">고칠 때 쓸 수 있는 말 · 누르면 커서 자리에 들어가요</div><div class="cards" style="margin-top:4px">${f.words.map(w => `<button class="card tcard wchip" data-ins="${esc(w)}" data-word="1">${esc(w)}</button>`).join('')}</div>` : ''}</div>`).join('')}
         ${!tags.length && !it.added && pk[it.key] ? '<div class="rec part" style="margin:6px 0 0">우리 모둠이 1라운드에서 짚은 문장이에요. 숨은 결함은 아니었지만 더 낫게 고쳐도 돼요.</div>' : ''}
         ${it.saved ? `<div class="m" style="margin-top:8px">💾 ${esc(it.saved.who || it.saved.role)}(${esc(it.saved.role)})이 저장함${it.draft ? ' · 지금 고치는 중인 내용은 아직 저장 전' : ''}</div>` : ''}
         ${relDataHTML(it, tags)}
@@ -341,7 +342,8 @@ function renderRewrite() {
         <label for="lineReason">왜 이렇게 바꿨나요? <span style="font-weight:400;color:var(--ink-soft)">(상호 심사 때 다른 모둠이 이 이유를 보고 타당한지 판단해요)</span></label>
         <input type="text" id="lineReason" maxlength="300" value="${esc(it.reason || '')}" placeholder="예) 블로그는 믿을 수 없어서 자료 6의 설문 결과로 바꿨다">
         <div class="btns" style="flex-wrap:wrap">
-          <button class="btn ghost" data-act="prev">◀ 이전</button>
+          <button class="btn ghost" data-act="prev" ${at <= 0 ? 'disabled' : ''}>◀ 이전 문장</button>
+          <button class="btn ghost" data-act="undo" ${(undoStack[it.key] || []).length ? '' : 'disabled'}>↶ 되돌리기</button>
           ${it.added ? '' : '<button class="btn ghost" data-act="reset">원문으로</button>'}
           <button class="btn ghost" data-act="del">${it.del ? '되살리기' : '이 문장 빼기'}</button>
           <button class="btn ghost" data-act="add">＋ 뒤에 문장 넣기</button>
@@ -359,9 +361,9 @@ function relDataHTML(it, tags) {
   const names = new Set((it.orig.match(/자료\s*\d+/g) || []).map(x => x.replace(/\s+/g, ' ')));
   const list = S.data.filter(d => !d.locked && (ids.has(d.id) || names.has(d.name)));
   if (!list.length) return '';
-  return `<div class="reldata"><div class="m"><b>📂 이 문장에 쓸 자료</b> · 누르면 고친 문장 칸에 출처와 함께 들어가요</div>` +
-    list.map(d => `<button class="card tcard" data-ins="${esc(d.name + ' · ' + d.loc + '에 따르면, ' + d.text + ' ')}" style="display:block;width:100%;margin-top:6px;text-align:left">
-      <b style="color:var(--ok)">${esc(d.name)} · ${esc(d.loc)}</b>${ids.has(d.id) ? ' <span class="tag" style="background:var(--gold)">추천</span>' : ' <span class="tag" style="background:var(--ink-soft)">원문에 쓰인 자료</span>'}<br>${esc(d.text)}</button>`).join('') + `</div>`;
+  return `<div class="reldata"><div class="m"><b>📂 이 문장에 쓸 자료</b> · 출처만 넣거나, 자료 문장을 통째로 넣을 수 있어요</div>` +
+    list.map(d => `<div class="ev" style="margin-top:6px"><div class="h">${esc(d.name)} · ${esc(d.loc)}${ids.has(d.id) ? ' <span class="tag" style="background:var(--gold)">추천</span>' : ' <span class="tag" style="background:var(--ink-soft)">원문에 쓰인 자료</span>'}</div><div class="b">${esc(d.text)}</div>
+      <div class="cards" style="margin-top:6px"><button class="card tcard" data-ins="${esc('(' + d.name + ' · ' + d.loc + ')')}" data-word="1">출처만 넣기 (${esc(d.name)} · ${esc(d.loc)})</button><button class="card tcard" data-ins="${esc(d.name + ' · ' + d.loc + '에 따르면, ' + d.text + ' ')}">문장으로 넣기</button></div></div>`).join('') + `</div>`;
 }
 function curSec() { const it = allItems().find(i => i.key === curKey); return it ? it.sec : ''; }
 function unsaved() { return Object.keys(lineDraft).length > 0; }
@@ -381,7 +383,8 @@ function rwAct(act) {
   };
   if (act === 'stash') { keepDraft(); return; }
   if (act === 'prev') { keepDraft(); move(-1); return render(); }
-  if (act === 'reset') { lineDraft[it.key] = { text: it.orig, reason: $('lineReason').value, del: false, after: '' }; saveDrafts(); return render(); }
+  if (act === 'undo') { const st = undoStack[it.key] || []; if (!st.length) return; const v = st.pop(); const r = $('lineReason') ? $('lineReason').value : it.reason; lineDraft[it.key] = { text: v, reason: r, del: false, after: it.after || '' }; saveDrafts(); render(); const ta = $('lineText'); if (ta) { ta.focus(); lastTA = ta; } return; }
+  if (act === 'reset') { pushUndo(it.key, $('lineText') ? $('lineText').value : it.text); lineDraft[it.key] = { text: it.orig, reason: $('lineReason').value, del: false, after: '' }; saveDrafts(); return render(); }
   if (act === 'del') { keepDraft(); const d = lineDraft[it.key] || { text: it.text, reason: it.reason, after: it.after || '' }; d.del = !it.del; lineDraft[it.key] = d; saveDrafts(); return render(); }
   if (act === 'add') { keepDraft(); const k = newKey(); lineDraft[k] = { text: '', reason: '', del: false, after: it.added ? it.after : it.key }; saveDrafts(); curKey = k; if (rwMode !== 'all' && rwMode !== 'flag') rwMode = 'flag'; render(); const ta = $('lineText'); if (ta) { ta.focus(); lastTA = ta; } return; }
   if (act === 'save') {
@@ -409,7 +412,7 @@ function renderToolbox() {
   let body = '';
   if (toolTab === 'data') body = S.data.map(d => `<button class="card tcard" data-ins="${esc(d.name + ' · ' + d.loc + '에 따르면, ' + d.text + ' ')}" style="display:block;width:100%;margin-bottom:6px"><b style="color:var(--ok)">${esc(d.name)} · ${esc(d.loc)}</b><br>${esc(d.text)}</button>`).join('');
   else if (toolTab === 'phrase') body = ph.map(p => `<button class="card tcard" data-ins="${esc(p.text + ' ')}" style="display:block;width:100%;margin-bottom:6px"><span style="font-size:12px;color:var(--gold);font-weight:700">${esc(p.section === '공통' ? '공통' : p.section)} · ${esc(p.kind)}</span><br>${esc(p.text)}</button>`).join('');
-  else body = `<div class="cards">${words.map(p => `<button class="card tcard" data-ins="${esc(p.text)}">${esc(p.text)}</button>`).join('')}</div>`;
+  else body = `<div class="cards">${words.map(p => `<button class="card tcard" data-ins="${esc(p.text)}" data-word="1">${esc(p.text)}</button>`).join('')}</div>`;
   $('sheetInner').dataset.mode = 'tool';
   $('sheetInner').innerHTML = `<div style="display:flex;gap:6px;align-items:center"><b style="font-family:var(--display)">카드 상자</b>
       <button class="card ${toolTab === 'data' ? 'on' : ''}" data-tt="data">자료 카드</button><button class="card ${toolTab === 'phrase' ? 'on' : ''}" data-tt="phrase">표현 카드 (${esc(sec)})</button><button class="card ${toolTab === 'word' ? 'on' : ''}" data-tt="word">핵심 단어</button>
@@ -417,18 +420,22 @@ function renderToolbox() {
     <div style="max-height:${toolOpen ? '30vh' : '0'};overflow:auto;margin-top:${toolOpen ? 8 : 0}px">${body}<p class="muted" style="margin:4px 0 0">카드를 누르면 '고친 문장' 칸의 커서 자리에 들어가요. ( ) 칸이 바로 선택되니 그대로 입력하면 돼요.</p></div>`;
 }
 
+let undoStack = {};
+function pushUndo(key, text) { (undoStack[key] = undoStack[key] || []).push(text); if (undoStack[key].length > 30) undoStack[key].shift(); }
 function insertCard(text, isWord) {
   const ta = $('lineText');
   if (!ta || ta.disabled) return;
+  pushUndo(ta.dataset.rw, ta.value);
   let a = ta.selectionStart ?? ta.value.length, b = ta.selectionEnd ?? a;
   if (document.activeElement !== ta && !(lastTA === ta)) { a = b = ta.value.length; }
-  if (!isWord && a === b && a > 0 && !/\s/.test(ta.value[a - 1])) text = ' ' + text;
+  if (a === b && a > 0 && !/[\s(]/.test(ta.value[a - 1]) && !/^[,.)을를이가은는의에]/.test(text)) text = ' ' + text;
   ta.value = ta.value.slice(0, a) + text + ta.value.slice(b);
   const blank = ta.value.indexOf('( ', a);
   ta.focus();
   if (blank >= 0 && blank < a + text.length) { const close = ta.value.indexOf(')', blank); ta.setSelectionRange(blank, close + 1); }
   else ta.setSelectionRange(a + text.length, a + text.length);
   rwAct('stash');
+  const u = document.querySelector('[data-act="undo"]'); if (u) u.disabled = false;
 }
 
 /* ---------- 3 상호 심사 (문장별 타당성) ---------- */
@@ -547,7 +554,7 @@ document.addEventListener('click', e => {
     return;
   }
   const tt = t.closest('[data-tt]'); if (tt) { if (tt.dataset.tt === 'fold') toolOpen = !toolOpen; else { toolTab = tt.dataset.tt; toolOpen = true; } renderToolbox(); return; }
-  const ins = t.closest('[data-ins]'); if (ins) { insertCard(ins.dataset.ins, toolTab === 'word'); return; }
+  const ins = t.closest('[data-ins]'); if (ins) { insertCard(ins.dataset.ins, ins.dataset.word === '1'); return; }
   const ac = t.closest('[data-act]'); if (ac) { rwAct(ac.dataset.act); return; }
   const md = t.closest('[data-mode]'); if (md) { rwMode = md.dataset.mode; render(); return; }
   const gg = t.closest('[data-go]'); if (gg) { const tx = $('lineText'); if (tx) rwAct('stash'); curKey = gg.dataset.go; if (gg.classList.contains('dim')) rwMode = 'all'; render(); return; }
