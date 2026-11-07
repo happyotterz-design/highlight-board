@@ -257,18 +257,18 @@ function phrases_() { return cached_('phrases', () => rows_(SH.PHRASE).filter(r 
 function zones_() { return cached_('zones', () => { const o = {}; rows_(SH.ZONE).forEach(r => o[Number(r[0])] = String(r[1]).split(',').map(s => s.trim()).filter(Boolean)); return o; }); }
 
 /* 상태(라운드)는 반별로 스크립트 속성에 저장: { cur: '2-2반', by: { '2-2반': { phase, reveal, at } } } */
+// 상태는 캐시하지 않고 매번 스크립트 속성에서 읽음 (여러 기기가 동시에 읽을 때 옛 단계가 남는 문제 방지)
 function allState_() {
-  const cache = CacheService.getScriptCache(), c = cache.get('state');
-  if (c) return JSON.parse(c);
   const p = PropertiesService.getScriptProperties().getProperty('state');
   let s = p ? JSON.parse(p) : {};
   if (!s.by) s = { cur: '', by: {} };            // 예전 형식이면 새로 시작
-  cache.put('state', JSON.stringify(s), 60);
   return s;
 }
 function saveAll_(s) {
-  PropertiesService.getScriptProperties().setProperty('state', JSON.stringify(s));
-  CacheService.getScriptCache().put('state', JSON.stringify(s), 60);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try { PropertiesService.getScriptProperties().setProperty('state', JSON.stringify(s)); }
+  finally { lock.releaseLock(); }
 }
 function curCls_() { return allState_().cur || ''; }
 function getState_() {

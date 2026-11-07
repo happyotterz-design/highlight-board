@@ -114,7 +114,7 @@ header{display:flex;align-items:center;gap:14px;padding:10px 20px;color:#e8efec;
 <div class="login" id="login"><div class="box"><b>교사 비밀번호</b><input type="password" id="pin" inputmode="numeric" autocomplete="off"><div style="display:flex;gap:8px"><button class="tool red" id="pinOk" style="flex:1">확인</button><button class="tool" id="pinCancel">닫기</button></div><div id="pinMsg" style="color:var(--stamp);margin-top:8px"></div></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="common.js?v=7"></script>
+<script src="common.js?v=8"></script>
 <script>
 let B = null, D = null, pin = sessionGet('case_pin') || '', sel = null, gtab = 1, cardSel = '', revealDone = false;
 let fs = Number(store('case_fs')) || 22;
@@ -233,7 +233,10 @@ function render() {
   renderHeader();
   const keep = [...document.querySelectorAll('.col')].map(c => c.scrollTop);
   if (!D.state.cls) { $('wrap').innerHTML = `<div class="col" style="flex:1;display:flex;align-items:center;justify-content:center;color:#e8efec;font-size:1.1em;text-align:center">아직 열린 반이 없어요.<br>교사 로그인 → 반·기록 관리에서 오늘 수업할 반을 열어 주세요.</div>`; return; }
-  $('wrap').innerHTML = [vBrief, vFind, vRewrite, vReview, vSelf, vResult][phase()]();
+  let html;
+  try { html = [vBrief, vFind, vRewrite, vReview, vSelf, vResult][phase()](); }
+  catch (err) { html = `<div class="col" style="flex:1;color:#fff;padding:20px">이 단계 화면을 그리다 문제가 생겼어요. 이 화면을 캡처해 주세요.<br><small>${esc(B.phases[phase()] || '')} · ${esc(err && err.message || err)}</small></div>`; }
+  $('wrap').innerHTML = html;
   document.querySelectorAll('.col').forEach((c, i) => { if (keep[i]) c.scrollTop = keep[i]; });
   if (phase() === 0 && window.QRCode && $('qr')) new QRCode($('qr'), { text: studentURL, width: 220, height: 220 });
   if (phase() === 5 && D.result && !revealDone) runReveal();
