@@ -22,9 +22,9 @@
  *  기록  : 학생 제출이 쌓이는 곳 (숨김 칸에 아무 글자나 적으면 점수·화면에서 빠짐)
  */
 
-const SH = { PHRASE: '표현카드', TEXT: '본문', CONF: '설정', FLAW: '결함', DATA: '자료', CLUE: '단서', ZONE: '복원구역', LOG: '기록' };
+const SH = { MODEL: '모범답안', PHRASE: '표현카드', TEXT: '본문', CONF: '설정', FLAW: '결함', DATA: '자료', CLUE: '단서', ZONE: '복원구역', LOG: '기록' };
 const LOG_HEAD = ['id', '시각', '종류', '모둠', '역할', '문장번호', '고른 문장', '결함 카드', '문제점', '이렇게 바꾸자', '판정', '대상', '숨김', '반', '이름'];
-const PHASES = ['브리핑', '1라운드 결함 수사', '2라운드 보고서 복원', '3라운드 상호 심사', '4라운드 내 초안 수사', '결과 공개'];
+const PHASES = ['브리핑', '1라운드 결함 수사', '2라운드 보고서 복원', '3라운드 상호 심사', '4라운드 베스트 투표', '결과 공개'];
 const CARDS = [
   ['찬반형 질문', '탐구 질문이 예/아니오로 끝난다'],
   ['위치 없는 출처', '자료 번호는 있지만 몇 번째 문단인지 없다'],
@@ -139,6 +139,8 @@ function setupGame() {
     ['공통', '핵심 단어', '과태료'], ['공통', '핵심 단어', '조건부 운영'], ['공통', '핵심 단어', '생태 보전 기준'], ['공통', '핵심 단어', '정상 탐방로 제한']
   ], [80, 90, 560]);
 
+  make(SH.MODEL, [['구간', '모범 글', '핵심 요소 (;로 요소 구분, /로 같은 뜻)']].concat(MODEL_DEFAULT), [80, 520, 300]);
+
   const lg = make(SH.LOG, [LOG_HEAD], [70, 130, 60, 50, 80, 90, 220, 110, 220, 220, 70, 60, 50, 60, 90]);
   if (String(lg.getRange(1, 14).getValue()) !== '반') lg.getRange(1, 14).setValue('반').setFontWeight('bold');   // 예전 기록 탭에 '반' 칸 추가
   if (String(lg.getRange(1, 15).getValue()) !== '이름') lg.getRange(1, 15).setValue('이름').setFontWeight('bold');
@@ -179,7 +181,7 @@ function doPost(e) {
     const req = JSON.parse(e.postData.contents || '{}');
     const api = {
       boot: boot, state: studentState, submitFind: submitFind, useHint: useHint,
-      saveLine: saveLine, submitRline: submitRline, submitReviewAll: submitReviewAll, submitSelf: submitSelf,
+      saveLine: saveLine, submitRline: submitRline, submitReviewAll: submitReviewAll, submitSelf: submitSelf, submitVote: submitVote,
       board: boardState, setPhase: setPhase, toggleHide: toggleHide, checkPin: checkPin,
       admin: admin, openClass: openClass, addClass: addClass, resetClass: resetClass, setHidden: setHidden
     };
@@ -296,7 +298,7 @@ function logAll_() {
   return list;
 }
 function bust_() { CacheService.getScriptCache().remove('log'); }
-function bustAll_() { CacheService.getScriptCache().removeAll(['log', 'conf', 'secs', 'flaws', 'data', 'clues', 'zones', 'phrases']); }
+function bustAll_() { CacheService.getScriptCache().removeAll(['log', 'conf', 'secs', 'flaws', 'data', 'clues', 'zones', 'phrases', 'models']); }
 
 function append_(row, who) {
   const lock = LockService.getScriptLock();
@@ -374,7 +376,7 @@ function boot() {
 }
 
 /* 우리 모둠 화면에 필요한 것만 */
-function studentState(group) {
+function studentState(group, voter) {
   const st = getState_();
   const conf = conf_();
   group = Number(group);
@@ -409,6 +411,7 @@ function studentState(group) {
     hints: hints,
     lines: myLines,
     review: st.phase >= 3 ? { target, changes: changes_(lines_(log, target)), mine: myR, comment: allC ? allC.problem : '', got: gotR } : null,
+    vote: st.phase >= 4 ? (() => { const V = votes_(log); const mineV = {}; Object.values(V.latest).filter(e => e.keys[0] === String(voter || '')).forEach(e => mineV[e.target] = Number(e.card)); return { sections: candidates_(log, conf), mine: mineV }; })() : null,
     selfs: mine.filter(e => e.type === 'self').map(e => ({ role: e.role, card: e.card, problem: e.problem, fix: e.fix })),
     allFlaws: st.phase >= 2 ? flaws.map(f => ({ code: f.code, card: f.card, note: f.note, evidence: f.evidence, keys: f.keys, role: f.role, words: f.words || [], found: !!(found[f.code] && found[f.code].kind === 'full') })) : [],
     foundCards: st.phase >= 4 ? classCards_(log, flaws) : [],
@@ -557,6 +560,112 @@ function saveLine(p) {
   if (!del && !isOrig) need_(text.replace(/\s/g, '').length >= 4, '고친 문장이 너무 짧아요.');
   append_(['line', g, p.role, key, JSON.stringify({ after }), del ? 'del' : '', reason, text, '', sec, ''], p.who);
   return { ok: true };
+}
+
+/* ---------- 4라운드: 구간별 베스트 투표 ---------- */
+// 모범 답안 (「모범답안」 탭이 있으면 그걸 씀). 핵심 요소: ';'로 요소 구분, '/'로 같은 뜻의 다른 표현
+const MODEL_DEFAULT = [
+  ['탐구 질문', '환경공학자의 시선에서, 설악산 오색 케이블카가 노약자의 접근권을 넓히면서도 산양 서식지와 아고산대 식생을 지키려면 어떤 기준으로 운영되어야 하는가?',
+    '어떤 기준/어떤 조건/기준으로/조건에서/조건으로; 접근권/노약자/고령; 생태/산양/식생/자연'],
+  ['서론', '설악산 오색 케이블카는 40년 넘게 논란이 되어 온 사업이다. 양양군은 케이블카를 설치하면 연간 방문객이 약 50만 명 늘고 지역 경제 효과가 1,000억 원 이상일 것으로 예상했다(자료 1 · 2번째 문단). 이 수치는 케이블카가 지역에 줄 경제적 이익을 보여 준다. 반면 상부 정류장 예정지는 산양 흔적이 해마다 100건 이상 확인되는 서식지와 겹친다(자료 1 · 5번째 문단). 환경공학자에게 이는 경제 효과만으로 설치를 판단할 수 없다는 의미가 있다. 따라서 나는 환경공학자로서 생태 보전 기준이 지켜질 때에만 케이블카를 운영해야 한다고 주장한다.',
+    '2번째 문단; 50만; 보여 준다/보여준다/의미/뜻한다; 산양/서식지/5번째 문단; 환경공학자에게/환경공학자로서'],
+  ['본론 1', '케이블카가 필요한 가장 큰 이유는 노약자의 접근권이다. 현재 오색에서 대청봉까지는 걸어서 4~5시간이 걸리기 때문에 노약자나 장애인은 정상에 오르기 어렵다. 자료 6 · 2번째 문단에 따르면, 고령층 응답자의 62%가 체력 때문에 국립공원 정상 경관을 포기한 적이 있다고 답했다. 이는 체력 때문에 국립공원의 경관을 누리지 못하는 사람이 많다는 것을 보여 준다. 다만 환경공학자로서, 해발 1,400m 이상 아고산대 식생은 한 번 훼손되면 회복에 수십 년이 걸리므로(자료 2 · 3번째 문단) 생태 보전 기준이 지켜진다는 조건이 먼저 필요하다.',
+    '자료 6; 62%; 환경공학자; 생태/보전/식생/아고산대; 조건/기준/다만'],
+  ['본론 2', '공사를 하는 동안 소음과 먼지가 생기고, 등산로 일부가 막혀 등산객이 불편할 수 있다(자료 3 · 2번째 문단). 이 자료는 공사 중 불편이 일시적이라는 근거가 되지만, 케이블카를 운영한 뒤의 생태 피해는 따로 따져야 한다는 점을 보여 준다. 물론 내 주장에도 한계가 있다. 생태 보호를 위해 상부 정류장 이용객은 정상 방향 탐방로로 갈 수 없어(자료 5 · 4번째 문단), 케이블카로 누구나 정상에 오를 수 있는 것은 아니다. 그럼에도 전망 구역까지의 경관 접근권을 넓힌다는 점에서 의미가 있다.',
+    '근거/의미/보여 준다/보여준다; 운영/따로/생태 피해; 한계; 정상/탐방로/자료 5/회복; 그럼에도/보완/하지만'],
+  ['본론 3', '이런 문제를 해결하기 위해 두 가지 대안을 제안한다. 첫째, 해외 국립공원의 사례처럼(자료 4 · 3번째 문단) 강원도와 양양군은 관람 구역을 벗어난 이용객에게 과태료를 부과하는 규정을 조례로 정해야 한다. 둘째, 같은 사례를 본떠 양양군은 케이블카 이용 요금의 10%를 생태 복원 기금으로 의무 적립해야 한다. 이 기금은 훼손된 아고산대 식생과 산양 서식지를 복원하는 데 쓴다.',
+    '과태료/조례/규정; 관람 구역/구역; 10%; 의무/적립; 기금/복원'],
+  ['결론', '따라서 요금 10%의 생태 복원 기금 적립과 관람 구역 제한이라는 조건이 지켜질 때에만 케이블카는 접근권과 생태 보전을 함께 이룰 수 있다. 환경공학자로서 나는 한 번 훼손되면 되돌리기 어려운 자연을 가장 먼저 지켜야 한다고 생각한다.',
+    '때에만/조건이 지켜/조건; 함께; 환경공학자로서/가치/중요/먼저']
+];
+function models_() {
+  return cached_('models', () => {
+    const rows = rows_(SH.MODEL).filter(r => String(r[0]).trim() && String(r[1]).trim());
+    const src = rows.length ? rows : MODEL_DEFAULT;
+    const o = {};
+    src.forEach(r => o[String(r[0]).trim()] = { text: String(r[1]), elements: String(r[2] || '').split(';').map(x => x.split('/').map(y => y.trim()).filter(Boolean)).filter(a => a.length) });
+    return o;
+  });
+}
+function norm_(t) { return String(t || '').replace(/[\s.,·()"'“”‘’\[\]?!~]/g, ''); }
+function dice_(a, b) {
+  a = norm_(a); b = norm_(b);
+  if (a.length < 2 || b.length < 2) return 0;
+  const bg = s => { const m = {}; for (let i = 0; i < s.length - 1; i++) { const k = s.substr(i, 2); m[k] = (m[k] || 0) + 1; } return m; };
+  const A = bg(a), Bm = bg(b); let inter = 0, na = 0, nb = 0;
+  Object.keys(A).forEach(k => { na += A[k]; if (Bm[k]) inter += Math.min(A[k], Bm[k]); });
+  Object.keys(Bm).forEach(k => nb += Bm[k]);
+  return 2 * inter / (na + nb);
+}
+function completion_(name, text) {
+  const m = models_()[name]; if (!m) return null;
+  const t = norm_(text);
+  const hits = m.elements.map(alts => alts.some(a => t.indexOf(norm_(a)) >= 0));
+  const ratio = m.elements.length ? hits.filter(Boolean).length / m.elements.length : 0;
+  const pct = Math.round(100 * (0.7 * ratio + 0.3 * dice_(text, m.text)));
+  return { pct, hit: hits.filter(Boolean).length, total: m.elements.length, missing: m.elements.filter((a, i) => !hits[i]).map(a => a[0]) };
+}
+function parts_(si, sentences, lines) {
+  const out = [];
+  const adds = Object.values(lines).filter(l => l.key.indexOf('n:') === 0 && !l.del && l.text.trim());
+  sentences.forEach((orig, j) => {
+    const k = si + '-' + j, L = lines[k];
+    if (!(L && L.del)) out.push({ t: L ? L.text : orig, c: !!(L && L.text !== orig) });
+    adds.filter(a => a.after === k).sort((a, b) => a.time - b.time).forEach(a => out.push({ t: a.text, c: true }));
+  });
+  return out;
+}
+function candidates_(log, conf) {
+  return sections_().map((s, si) => {
+    const cands = [];
+    for (let g = 1; g <= conf.groups; g++) {
+      const p = parts_(si, s.sentences, lines_(log, g));
+      const text = p.map(x => x.t).join(' ');
+      if (text !== s.sentences.join(' ')) cands.push({ g, text, parts: p });
+    }
+    return { name: s.name, original: s.sentences.join(' '), cands };
+  });
+}
+function votes_(log) {
+  const m = {};
+  log.filter(e => e.type === 'vote').forEach(e => { m[(e.keys[0] || '') + '>' + e.target] = e; });
+  const tally = {};
+  Object.values(m).forEach(e => { const k = e.target + '|' + e.card; tally[k] = (tally[k] || 0) + 1; });
+  return { latest: m, tally };
+}
+function submitVote(p) {
+  needClass_();
+  const st = getState_(); need_(st.phase === 4, '지금은 베스트 투표 시간이 아니에요.');
+  const conf = conf_(); const g = Number(p.group); checkGroupRole_(g, p.role, conf);
+  const voter = String(p.voter || '').replace(/[^a-z0-9]/gi, '').slice(0, 20);
+  need_(voter.length >= 6, '기기 정보를 읽지 못했어요. 새로고침해 주세요.');
+  const sec = String(p.section || ''), cand = Number(p.cand);
+  const c = candidates_(log_(), conf).find(x => x.name === sec);
+  need_(c && c.cands.some(x => x.g === cand), '투표할 수 없는 글이에요.');
+  need_(cand !== g, '우리 모둠 글에는 투표할 수 없어요.');
+  append_(['vote', g, p.role, voter, '', String(cand), '', '', '', sec, ''], p.who);
+  return { ok: true };
+}
+function finalReport_(log, conf) {
+  const V = votes_(log);
+  const okBy = {};
+  Object.values(lastRline_(log)).forEach(e => {
+    if (e.card !== 'ok') return;
+    const t = Number(e.target), c = changes_(lines_(log, t)).find(x => x.key === e.keys[0]);
+    if (c) okBy[t + '|' + c.sec] = (okBy[t + '|' + c.sec] || 0) + 1;
+  });
+  return candidates_(log, conf).map(s => {
+    let best = null, bestScore = -1;
+    s.cands.forEach(c => {
+      const v = V.tally[s.name + '|' + c.g] || 0, ok = okBy[c.g + '|' + s.name] || 0;
+      const sc = v * 10000 + ok * 100 + (conf.groups - c.g);
+      if (sc > bestScore) { bestScore = sc; best = { g: c.g, votes: v, ok, text: c.text, parts: c.parts }; }
+    });
+    const text = best ? best.text : s.original;
+    return { name: s.name, original: s.original, text, parts: best ? best.parts : [{ t: s.original, c: false }], by: best ? best.g : 0, votes: best ? best.votes : 0,
+      tally: s.cands.map(c => ({ g: c.g, votes: V.tally[s.name + '|' + c.g] || 0 })),
+      model: (models_()[s.name] || {}).text || '', done: completion_(s.name, text), before: completion_(s.name, s.original) };
+  });
 }
 
 /* ---------- 3라운드: 문장별 타당성 심사 ---------- */
@@ -717,6 +826,7 @@ function boardState(pin) {
     teacher, state: st,
     finds: log.filter(e => e.type === 'find').map(e => ({ id: e.id, group: e.group, role: e.role, keys: e.keys, card: e.card, problem: e.problem, fix: e.fix, hit: e.result.split(':')[0] || 'none' })),
     flawMap, progress, essays, changes, rlines, reviews, selfs,
+    vote: st.phase >= 4 ? { sections: candidates_(log, conf).map(x => ({ name: x.name, cands: x.cands.map(c => ({ g: c.g, parts: c.parts })) })), tally: votes_(log).tally, voters: new Set(Object.values(votes_(log).latest).map(e => e.keys[0])).size } : null,
     result: st.phase >= 5 && st.reveal ? resultPack_(log, flaws, conf) : null
   };
 }
@@ -729,24 +839,14 @@ function resultPack_(log, flaws, conf) {
     group: G.group, total: G.total, find: G.find, bonus: G.bonus, review: G.review, hint: G.hint,
     flawsFound: Object.values(G.flaws).filter(f => f.pts === 3).length, grade: grade_(G.total, max)
   }));
-  // 복원된 보고서: 구간마다 '타당해요'를 가장 많이 받은 모둠의 글 (같으면 더 많이 고친 모둠)
-  const secs = sections_();
-  const okBy = {};
-  Object.values(lastRline_(log)).forEach(e => {
-    if (e.card !== 'ok') return;
-    const t = Number(e.target), c = changes_(lines_(log, t)).find(x => x.key === e.keys[0]);
-    if (c) okBy[t + '|' + c.sec] = (okBy[t + '|' + c.sec] || 0) + 1;
-  });
-  const restored = secs.map((s, si) => {
-    let best = 0, bestScore = -1, bestText = s.text;
-    for (let g = 1; g <= conf.groups; g++) {
-      const L = lines_(log, g);
-      const nChg = changes_(L).filter(c => c.sec === s.name).length;
-      if (!nChg) continue;
-      const sc = (okBy[g + '|' + s.name] || 0) * 100 + nChg;
-      if (sc > bestScore) { bestScore = sc; best = g; bestText = assemble_(si, s.sentences, L); }
-    }
-    return { name: s.name, original: s.text, text: bestText, by: best, ok: best ? (okBy[best + '|' + s.name] || 0) : 0 };
-  });
-  return { rank, max, restored, flaws: flaws.map(f => ({ code: f.code, section: f.section, card: f.card, note: f.note })) };
+  // 반 전체 투표로 완성한 보고서 + 모범 답안 대비 완성도
+  const restored = finalReport_(log, conf);
+  const scored = restored.filter(r => r.done);
+  const overall = scored.length ? Math.round(scored.reduce((a, r) => a + r.done.pct, 0) / scored.length) : 0;
+  const overallBefore = scored.length ? Math.round(scored.reduce((a, r) => a + (r.before ? r.before.pct : 0), 0) / scored.length) : 0;
+  // 오늘 반에서 잡은 결함
+  const foundBy = {};
+  log.filter(e => e.type === 'find' && e.result.indexOf('full:') === 0).forEach(e => { const c = e.result.split(':')[1]; (foundBy[c] = foundBy[c] || {})[e.group] = true; });
+  const caught = flaws.map(f => ({ code: f.code, section: f.section, card: f.card, note: f.note, groups: Object.keys(foundBy[f.code] || {}).length }));
+  return { rank, max, restored, overall, overallBefore, caught, flaws: flaws.map(f => ({ code: f.code, section: f.section, card: f.card, note: f.note })) };
 }

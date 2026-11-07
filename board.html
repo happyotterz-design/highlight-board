@@ -114,7 +114,7 @@ header{display:flex;align-items:center;gap:14px;padding:10px 20px;color:#e8efec;
 <div class="login" id="login"><div class="box"><b>교사 비밀번호</b><input type="password" id="pin" inputmode="numeric" autocomplete="off"><div style="display:flex;gap:8px"><button class="tool red" id="pinOk" style="flex:1">확인</button><button class="tool" id="pinCancel">닫기</button></div><div id="pinMsg" style="color:var(--stamp);margin-top:8px"></div></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="common.js?v=8"></script>
+<script src="common.js?v=9"></script>
 <script>
 let B = null, D = null, pin = sessionGet('case_pin') || '', sel = null, gtab = 1, cardSel = '', revealDone = false;
 let fs = Number(store('case_fs')) || 22;
@@ -203,29 +203,54 @@ function vReview() {
       <div class="paper"><h2>심사 진행</h2>${groups.map(g => `<div class="bar"><span style="width:150px">${g}모둠 → ${g % groups.length + 1}모둠</span><span>${D.progress[g].reviews} / ${D.progress[g].toReview}</span></div>`).join('')}</div></div>`;
 }
 
-/* 4 내 초안 수사 */
-function vSelf() {
-  const tally = {}; D.selfs.forEach(x => tally[x.card] = (tally[x.card] || 0) + 1);
-  const list = B.cards.map(c => ({ name: c.name, desc: c.desc, n: tally[c.name] || 0 })).sort((a, b) => b.n - a.n);
-  const max = Math.max(1, ...list.map(x => x.n));
-  const pick = cardSel || (list[0] && list[0].n ? list[0].name : '');
-  const plans = D.selfs.filter(x => x.card === pick);
-  return `<div class="col" style="flex:1"><div class="paper"><h2>우리 반 초안에 숨은 결함 <span class="muted">(제출 ${D.selfs.length}개)</span></h2>` +
-    list.map((c, i) => `<div class="fl ${i < 3 && c.n ? 'on' : ''}" data-cs="${esc(c.name)}" style="cursor:pointer;${pick === c.name ? 'outline:3px solid var(--ink)' : ''}"><span class="c">${i < 3 && c.n ? 'TOP' + (i + 1) : ''}</span><b>${esc(c.name)}</b><span class="b" style="display:inline-block;height:14px;border-radius:7px;background:var(--stamp);width:${180 * c.n / max}px;margin-left:auto"></span><span style="width:30px;text-align:right">${c.n}</span></div>`).join('') +
-    `</div></div><div class="col" style="flex:1"><div class="paper"><h2>「${esc(pick || '카드를 누르세요')}」 고칠 계획</h2>${plans.map(x => `<div class="cm"><div class="m">${x.group}모둠 · ${esc(x.role)}</div><div><b>어디</b> ${esc(x.where)}</div><div><b>계획</b> ${esc(x.plan)}</div></div>`).join('') || '<p class="muted">아직 없어요.</p>'}</div></div>`;
+/* 4 베스트 투표: 구간별 실시간 집계 */
+function partsHTML(parts) { return parts.map(p => p.c ? `<span style="text-decoration:underline 3px var(--ok);text-underline-offset:5px">${esc(p.t)}</span>` : esc(p.t)).join(' '); }
+function vVote() {
+  const V = D.vote || { sections: [], tally: {}, voters: 0 };
+  return `<div class="col grid">` + `<div class="paper" style="grid-column:1/-1;display:flex;align-items:center;gap:16px"><h2 style="margin:0">구간별 베스트 투표</h2><span class="muted" style="font-size:.8em">투표한 기기 ${V.voters}대 · 학생 화면에는 모둠 이름 없이 가안·나안으로 보여요</span></div>` +
+    V.sections.map(sec => {
+      if (!sec.cands.length) return `<div class="paper"><h2>${esc(sec.name)}</h2><p class="muted">고친 모둠이 없어요 (원문 사용)</p></div>`;
+      const max = Math.max(1, ...sec.cands.map(c => V.tally[sec.name + '|' + c.g] || 0));
+      return `<div class="paper"><h2>${esc(sec.name)}</h2>` + sec.cands.map(c => { const n = V.tally[sec.name + '|' + c.g] || 0;
+        return `<div class="cm ${n === max && n ? 'full' : ''}"><div class="m"><b>${c.g}모둠</b> · 👍 ${n}표 <span style="display:inline-block;height:10px;border-radius:5px;background:var(--stamp);width:${120 * n / max}px;margin-left:6px"></span></div>${partsHTML(c.parts)}</div>`; }).join('') + `</div>`;
+    }).join('') + `</div>`;
 }
 
-/* 5 결과 */
+/* 5 결과: 순위 → 완성된 보고서 → 완성도 → 오늘 잡은 결함 → 다음 시간 */
+let rtab = 'rank';
+const NEXT_NOTICE = [
+  '오늘 찾은 결함들은 여러분 초안에도 숨어 있을 수 있어요.',
+  '다음 시간에는 여러분이 직접 쓴 초안을 이름을 가린 익명으로 바꿔서 동료평가, 교사평가, AI 평가를 함께 진행합니다. 오늘 쓴 결함 카드가 그때의 평가 기준이 됩니다.',
+  '평가가 끝나면 받은 피드백을 바탕으로 초안을 직접 고치는 시간을 드립니다.'
+];
 function vResult() {
   if (!D.result) {
     return `<div class="col" style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:24px"><div class="stamp" style="font-size:2.4em;background:var(--paper)">수사 종료</div>
       <div style="color:#e8efec;font-size:1em">과연 명탐정은 어느 모둠일까?</div>${teacher() ? '<button class="tool red" id="reveal" style="font-size:24px;padding:14px 30px">결과 공개</button>' : ''}</div>`;
   }
   const R = D.result;
-  const order = R.rank.map((r, i) => ({ ...r, place: i + 1 }));
-  return `<div class="col" style="flex:1"><div class="paper"><h2>최종 순위 <span class="muted">만점 ${R.max}점</span></h2><div id="ranks">${order.map(r => `<div class="rank ${r.place === 1 ? 'first' : ''} ${revealDone ? 'in' : ''}" data-place="${r.place}"><span class="no">${r.place}위</span><div><b>${r.group}모둠</b> · ${r.total}점<div class="det">결함 ${r.flawsFound}개 · 발견 ${r.find} · 역할 보너스 ${r.bonus} · 타당해요 ${r.review} · 힌트 −${r.hint}</div></div><span class="gr">${esc(r.grade)}</span></div>`).join('')}</div></div></div>
-    <div class="col" style="flex:1.2"><div class="paper"><h2>복원된 보고서</h2>${R.restored.map(s => `<h3>${esc(s.name)} ${s.by ? `<span class="status">· ${s.by}모둠 복원${s.ok ? ' · 👍 ' + s.ok : ''}</span>` : '<span class="muted">· 원문</span>'}</h3><div class="rw">${esc(s.text)}</div>`).join('')}</div>
-    <div class="paper"><h2>숨은 결함 해설</h2>${R.flaws.map(f => `<div class="cm full"><div class="m">${esc(f.section)} · ${esc(f.card)}</div>${esc(f.note)}</div>`).join('')}</div></div>`;
+  const tabs = [['rank', '① 최종 순위'], ['report', '② 우리 반 보고서'], ['score', '③ 완성도'], ['caught', '④ 오늘 잡은 결함'], ['next', '⑤ 다음 시간']];
+  const head = `<div class="gtabs" style="grid-column:1/-1">${tabs.map(t => `<button data-rt="${t[0]}" class="${rtab === t[0] ? 'on' : ''}">${t[1]}</button>`).join('')}</div>`;
+  let body = '';
+  if (rtab === 'rank') {
+    const order = R.rank.map((r, i) => ({ ...r, place: i + 1 }));
+    body = `<div class="paper" style="max-width:1000px;margin:0 auto;width:100%"><h2>최종 순위 <span class="muted">만점 ${R.max}점</span></h2><div id="ranks">${order.map(r => `<div class="rank ${r.place === 1 ? 'first' : ''} ${revealDone ? 'in' : ''}" data-place="${r.place}"><span class="no">${r.place}위</span><div><b>${r.group}모둠</b> · ${r.total}점<div class="det">결함 ${r.flawsFound}개 · 발견 ${r.find} · 역할 보너스 ${r.bonus} · 타당해요 ${r.review} · 힌트 −${r.hint}</div></div><span class="gr">${esc(r.grade)}</span></div>`).join('')}</div></div>`;
+  } else if (rtab === 'report') {
+    body = `<div class="paper" style="max-width:1200px;margin:0 auto;width:100%"><h2>우리 반이 함께 완성한 보고서 <span class="muted">구간마다 투표 1등 글</span></h2>` +
+      R.restored.map(s => `<h3>${esc(s.name)} ${s.by ? `<span class="status">· ${s.by}모둠 · 👍 ${s.votes}표</span>` : '<span class="muted">· 원문</span>'}</h3><div class="rw">${partsHTML(s.parts)}</div>`).join('') + `</div>`;
+  } else if (rtab === 'score') {
+    body = `<div class="paper" style="max-width:1200px;margin:0 auto;width:100%"><div style="display:flex;align-items:center;gap:30px"><div><div class="muted">모범 답안과 비교한 완성도</div><div class="big">${R.overall}<small>%</small></div></div><div class="muted" style="font-size:.8em">처음 보고서(원문)는 ${R.overallBefore}%였어요.<br>핵심 요소가 들어갔는지(70%)와 모범 답안과 얼마나 비슷한지(30%)로 계산했어요.</div></div>` +
+      R.restored.map(s => s.done ? `<div class="cm"><div class="m"><b>${esc(s.name)}</b> · ${s.before ? s.before.pct : 0}% → <b style="color:var(--stamp)">${s.done.pct}%</b> · 핵심 요소 ${s.done.hit}/${s.done.total}${s.done.missing.length ? ` · 빠진 요소: ${esc(s.done.missing.join(', '))}` : ''}</div>
+        <div class="bar"><span class="b" style="width:${Math.max(4, 6 * s.done.pct)}px;max-width:600px"></span></div>
+        <details><summary class="m" style="cursor:pointer">모범 답안 보기</summary><div style="margin-top:6px">${esc(s.model)}</div></details></div>` : '').join('') + `</div>`;
+  } else if (rtab === 'caught') {
+    body = `<div class="paper" style="max-width:1200px;margin:0 auto;width:100%"><h2>오늘 우리가 잡은 결함</h2>` +
+      R.caught.map(f => `<div class="cm ${f.groups ? 'full' : 'part'}"><div class="m">${esc(f.section)} · ${f.groups ? f.groups + '개 모둠이 찾음' : '아무도 못 찾음'}</div><b style="font-size:1.05em">${esc(f.card)}</b> · ${esc(f.note)}</div>`).join('') + `</div>`;
+  } else {
+    body = `<div class="paper" style="max-width:1100px;margin:0 auto;width:100%;padding:34px 40px"><h2 style="font-size:1.4em">다음 시간 안내</h2>${NEXT_NOTICE.map(p => `<p style="font-size:1.05em;line-height:1.8;margin:0 0 14px">${esc(p)}</p>`).join('')}
+      <div style="display:flex;gap:14px;margin-top:20px;flex-wrap:wrap">${['① 내 초안 익명 공유', '② 동료평가 · 교사평가 · AI 평가', '③ 피드백 반영해 초안 고치기'].map(x => `<div class="stamp" style="font-size:.85em;transform:none;background:#fff">${x}</div>`).join('')}</div></div>`;
+  }
+  return `<div class="col" style="flex:1">${head}${body}</div>`;
 }
 
 function render() {
@@ -234,7 +259,7 @@ function render() {
   const keep = [...document.querySelectorAll('.col')].map(c => c.scrollTop);
   if (!D.state.cls) { $('wrap').innerHTML = `<div class="col" style="flex:1;display:flex;align-items:center;justify-content:center;color:#e8efec;font-size:1.1em;text-align:center">아직 열린 반이 없어요.<br>교사 로그인 → 반·기록 관리에서 오늘 수업할 반을 열어 주세요.</div>`; return; }
   let html;
-  try { html = [vBrief, vFind, vRewrite, vReview, vSelf, vResult][phase()](); }
+  try { html = [vBrief, vFind, vRewrite, vReview, vVote, vResult][phase()](); }
   catch (err) { html = `<div class="col" style="flex:1;color:#fff;padding:20px">이 단계 화면을 그리다 문제가 생겼어요. 이 화면을 캡처해 주세요.<br><small>${esc(B.phases[phase()] || '')} · ${esc(err && err.message || err)}</small></div>`; }
   $('wrap').innerHTML = html;
   document.querySelectorAll('.col').forEach((c, i) => { if (keep[i]) c.scrollTop = keep[i]; });
@@ -301,6 +326,7 @@ document.addEventListener('click', e => {
   const t = e.target;
   const k = t.closest('[data-k]'); if (k && phase() === 1) { sel = sel === k.dataset.k ? null : k.dataset.k; render(); return; }
   const h = t.closest('[data-hide]'); if (h) { h.disabled = true; call('toggleHide', pin, h.dataset.hide).then(() => poll(true)); return; }
+  const rtb = t.closest('[data-rt]'); if (rtb) { rtab = rtb.dataset.rt; render(); return; }
   const gt = t.closest('[data-gt]'); if (gt) { gtab = Number(gt.dataset.gt); render(); return; }
   const cs = t.closest('[data-cs]'); if (cs) { cardSel = cs.dataset.cs; render(); return; }
   const ph = t.closest('[data-ph]'); if (ph && teacher()) { go(Number(ph.dataset.ph)); return; }
@@ -316,7 +342,7 @@ document.addEventListener('click', e => {
     return go(Math.min(5, phase() + 1));
   }
   if (t.id === 'prev') return go(Math.max(0, phase() - 1));
-  if (t.id === 'reveal') { revealDone = false; return go(5, true); }
+  if (t.id === 'reveal') { revealDone = false; rtab = 'rank'; return go(5, true); }
   if (t.id === 'plus') { fs = Math.min(40, fs + 2); store('case_fs', fs); render(); return; }
   if (t.id === 'minus') { fs = Math.max(14, fs - 2); store('case_fs', fs); render(); return; }
   if (t.id === 'adminBtn') return openAdmin();

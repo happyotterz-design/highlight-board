@@ -122,6 +122,11 @@ textarea{resize:vertical;min-height:58px}
 .chipsec:first-child{margin-left:0}
 .rw .wipt{background:#fff1a8}
 .wchip{font-size:14px;padding:6px 10px;background:#fff8e6;border-color:#e7c84a}
+.vcand{border:2px solid var(--rule);border-radius:12px;padding:10px 12px;margin-top:8px;background:#fff;cursor:pointer}
+.vcand.on{border-color:var(--stamp);background:#fff3f1}
+.vcand.own{opacity:.55;cursor:default;background:var(--paper-2)}
+.vcand .vt{font-size:16.5px;line-height:1.75;margin-top:4px}
+.chg{text-decoration:underline 2px var(--ok);text-underline-offset:4px}
 .reldata{margin-top:10px;padding:10px;border-radius:10px;background:var(--ok-bg)}
 .stepbox{border:2px solid var(--ink);border-radius:12px;padding:12px;background:#fff}
 .stepbox .m{font-size:13px;color:var(--ink-soft)}
@@ -152,7 +157,7 @@ textarea{resize:vertical;min-height:58px}
 <div class="sheet" id="sheet"><div class="inner" id="sheetInner"></div></div>
 <div class="verdict" id="verdict"><div class="vbox" id="vbox"></div></div>
 
-<script src="common.js?v=8"></script>
+<script src="common.js?v=9"></script>
 <script>
 let B = null;              // boot: 글, 카드, 단서, 구역
 let S = null;              // 우리 모둠 상태
@@ -461,15 +466,31 @@ function renderReview() {
     `<div class="paper"><h2>우리 모둠 글이 받은 심사</h2>${Object.keys(R.got || {}).length ? Object.keys(R.got).map(k => { const arr = R.got[k]; const it = allItems().find(i => i.key === k); return `<div class="rec"><div class="m">${esc(it ? it.sec : '')} · 👍 ${arr.filter(x => x.verdict === 'ok').length} · 🤔 ${arr.filter(x => x.verdict === 'no').length}</div>${esc(it ? it.text : '')}${arr.filter(x => x.comment).map(x => `<div class="m">“${esc(x.comment)}”</div>`).join('')}</div>`; }).join('') : '<p class="muted">아직 없어요.</p>'}</div>`;
 }
 
-/* ---------- 4 내 초안 수사 ---------- */
-function renderSelf() {
-  $('main').innerHTML = `<div class="paper"><h2>내 초안 수사</h2><p class="muted">우리 반이 찾아낸 결함 목록입니다. 내 초안을 펴 놓고, 나에게도 있는 결함을 하나 골라 어디에 있는지, 어떻게 고칠지 적으세요. 여러 번 제출해도 돼요.</p>
-      <div class="cards">${S.foundCards.map(c => `<button class="card ${card === c.name ? 'on' : ''}" data-card="${esc(c.name)}" style="${c.found ? '' : 'opacity:.55'}">${c.found ? '★ ' : ''}${esc(c.name)}</button>`).join('')}</div>
-      <div class="carddesc" id="carddesc">${esc(B.cards.find(c => c.name === card)?.desc || '★는 오늘 우리 반이 보고서에서 찾아낸 결함이에요.')}</div>
-      <label for="where">내 초안의 어디에? (구간과 문장)</label><input type="text" id="where" maxlength="300" placeholder="예) 본론2 마지막 문장">
-      <label for="plan">어떻게 고칠까?</label><textarea id="plan" maxlength="400" placeholder="예) 공사 기간 말고 운영 뒤의 생태 피해를 한계로 인정하고, 자료 2를 쓴다."></textarea>
-      <div class="btns"><button class="btn red" id="sendSelf">내 수사 결과 제출</button></div><div class="msg" id="msg"></div></div>
-    <div class="paper"><h2>우리 모둠 제출 ${S.selfs.length}개</h2>${S.selfs.map(x => `<div class="rec"><div class="m">${esc(x.role)} · ${esc(x.card)}</div><div><b>어디</b> ${esc(x.problem)}</div><div><b>고칠 계획</b> ${esc(x.fix)}</div></div>`).join('') || '<p class="muted">아직 없어요.</p>'}</div>`;
+/* ---------- 4 베스트 투표 ---------- */
+const VOTER = (() => { let v = store('case_voter'); if (!v) { v = Math.random().toString(36).slice(2, 12); store('case_voter', v); } return v; })();
+const LETTERS = ['가', '나', '다', '라', '마', '바', '사', '아'];
+function shuffleFor(arr, seed) {   // 모든 기기에서 같은 순서가 되도록 구간 이름으로 섞기
+  let h = 0; for (const ch of seed) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { h = (h * 1103515245 + 12345) >>> 0; const j = h % (i + 1); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+function partsHTML(parts) { return parts.map(p => p.c ? `<span class="chg">${esc(p.t)}</span>` : esc(p.t)).join(' '); }
+function renderVote() {
+  const V = S.vote || { sections: [], mine: {} };
+  const done = V.sections.filter(s => V.mine[s.name]).length, total = V.sections.filter(s => s.cands.some(c => c.g !== me.group)).length;
+  $('main').innerHTML = `<div class="paper"><h2>베스트 투표</h2><p class="muted">구간마다 모둠들이 고친 글이 이름 없이 '가안, 나안…'으로 나옵니다. <span class="chg">밑줄</span>이 고친 부분이에요. 가장 잘 고쳤다고 생각하는 글을 하나씩 고르세요. 우리 모둠 글에는 투표할 수 없어요. 다시 누르면 바꿀 수 있어요. 반 전체 투표 1등 글을 모아 마지막에 우리 반 보고서를 완성합니다.</p>
+      <div class="counter" style="color:var(--ink)"><span>투표한 구간</span><span class="n" style="color:var(--ink)">${done} / ${total}</span></div></div>` +
+    V.sections.map(sec => {
+      if (!sec.cands.length) return `<div class="paper"><h3 style="margin-top:0">${esc(sec.name)}</h3><p class="muted">이 구간은 고친 모둠이 없어서 원문을 그대로 씁니다.</p></div>`;
+      const order = shuffleFor(sec.cands, sec.name);
+      return `<div class="paper"><h3 style="margin-top:0">${esc(sec.name)} ${V.mine[sec.name] ? '<span class="ok">· 투표 완료</span>' : ''}</h3>
+        <div class="orig"><b>원문</b> ${esc(sec.original)}</div>` +
+        order.map((c, i) => {
+          const own = c.g === me.group, on = V.mine[sec.name] === c.g;
+          return `<div class="vcand ${on ? 'on' : ''} ${own ? 'own' : ''}" ${own ? '' : `data-vote="${esc(sec.name)}" data-g="${c.g}"`}>
+            <div class="m"><b>${LETTERS[i]}안</b>${own ? ' · 우리 모둠 글 (투표 불가)' : on ? ' · ✔ 내가 고른 글' : ''}</div><div class="vt">${partsHTML(c.parts)}</div></div>`;
+        }).join('') + `</div>`;
+    }).join('');
 }
 
 /* ---------- 5 결과 ---------- */
@@ -479,10 +500,17 @@ function renderResult() {
   const mine = R.rank.find(r => r.group === me.group);
   $('main').innerHTML = `<div class="paper" style="text-align:center"><div class="stampmark">사건 해결</div>
       ${mine ? `<p style="font-size:18px">${me.group}모둠은 <b>${mine.total}점</b> · <b style="color:var(--stamp)">${esc(mine.grade)}</b></p>` : ''}</div>
-    <div class="paper"><h2>최종 순위</h2>${R.rank.map((r, i) => `<div class="rank ${r.group === me.group ? 'me' : ''}"><span class="no">${i + 1}</span><span class="g">${r.group}모둠</span><span>${r.total}점 · 결함 ${r.flawsFound}개</span><span class="gr">${esc(r.grade)}</span></div>`).join('')}</div>
-    <div class="paper"><h2>복원된 보고서</h2>${R.restored.map(s => `<h3>${esc(s.name)} ${s.by ? `<span class="ok">· ${s.by}모둠 복원</span>` : ''}</h3><div class="rw">${esc(s.text)}</div>`).join('')}</div>
-    <div class="paper"><h2>숨은 결함 9개 해설</h2>${R.flaws.map(f => `<div class="rec full"><div class="m">${esc(f.section)} · ${esc(f.card)}</div>${esc(f.note)}</div>`).join('')}</div>`;
+    <div class="paper"><h2>최종 순위</h2>${R.rank.map((r, i) => `<div class="rank ${r.group === me.group ? 'me' : ''}"><span class="no">${i + 1}</span><span class="g">${r.group}모둠</span><span>${r.total}점</span><span class="gr">${esc(r.grade)}</span></div>`).join('')}</div>
+    <div class="paper"><h2>우리 반이 함께 완성한 보고서</h2><p class="muted">구간마다 투표 1등 글을 모았어요. 모범 답안과 비교한 완성도: <b style="color:var(--stamp);font-size:18px">${R.overall}%</b> (원문 ${R.overallBefore}%)</p>
+      ${R.restored.map(s => `<h3>${esc(s.name)} ${s.by ? `<span class="ok">· ${s.by}모둠 · 👍 ${s.votes}표</span>` : '<span class="muted">· 원문</span>'} ${s.done ? `<span class="muted">· 완성도 ${s.done.pct}%</span>` : ''}</h3><div class="rw">${partsHTML(s.parts)}</div>`).join('')}</div>
+    <div class="paper"><h2>오늘 우리가 잡은 결함</h2>${R.caught.map(f => `<div class="rec ${f.groups ? 'full' : 'part'}"><div class="m">${esc(f.section)} · <b>${esc(f.card)}</b> · ${f.groups ? f.groups + '개 모둠이 찾음' : '아무도 못 찾음'}</div>${esc(f.note)}</div>`).join('')}</div>
+    <div class="paper"><h2>다음 시간 안내</h2>${NEXT_NOTICE.map(p => `<p style="font-size:16px;line-height:1.7;margin:0 0 8px">${esc(p)}</p>`).join('')}</div>`;
 }
+const NEXT_NOTICE = [
+  '오늘 찾은 결함들은 여러분 초안에도 숨어 있을 수 있어요.',
+  '다음 시간에는 여러분이 직접 쓴 초안을 이름을 가린 익명으로 바꿔서 동료평가, 교사평가, AI 평가를 함께 진행합니다. 오늘 쓴 결함 카드가 그때의 평가 기준이 됩니다.',
+  '평가가 끝나면 받은 피드백을 바탕으로 초안을 직접 고치는 시간을 드립니다.'
+];
 
 /* ---------- 전체 그리기 ---------- */
 function render() {
@@ -495,7 +523,7 @@ function render() {
   if (p !== 2) document.body.classList.remove('tool');
   if (p !== 1) document.body.classList.remove('sheeton');
   if (tab === 'clue' && p === 1) { $('main').innerHTML = `<div class="tabs"><button data-tab="report">보고서</button><button data-tab="evidence">자료 상자</button><button data-tab="log">수사 기록</button><button data-tab="clue" class="on">내 단서</button></div><div class="paper"><h2>내 비밀 단서</h2>${clueHTML()}</div>`; return; }
-  [renderBrief, renderFind, renderRewrite, renderReview, renderSelf, renderResult][p]();
+  [renderBrief, renderFind, renderRewrite, renderReview, renderVote, renderResult][p]();
 }
 
 /* 입력 중에는 화면을 다시 그리지 않음 */
@@ -504,7 +532,7 @@ function typing() { const a = document.activeElement; return a && (a.tagName ===
 let lastSig = '';
 function poll(force) {
   if (!me.group) return Promise.resolve();
-  return call('state', me.group).then(st => {
+  return call('state', me.group, VOTER).then(st => {
     const sig = JSON.stringify(st);
     const phaseChanged = !S || S.state.phase !== st.state.phase || S.state.cls !== st.state.cls;
     if (store('case_cls') !== st.state.cls) { lineDraft = {}; saveDrafts(); store('case_cls', st.state.cls); }
@@ -558,6 +586,11 @@ document.addEventListener('click', e => {
   const ac = t.closest('[data-act]'); if (ac) { rwAct(ac.dataset.act); return; }
   const md = t.closest('[data-mode]'); if (md) { rwMode = md.dataset.mode; render(); return; }
   const gg = t.closest('[data-go]'); if (gg) { const tx = $('lineText'); if (tx) rwAct('stash'); curKey = gg.dataset.go; if (gg.classList.contains('dim')) rwMode = 'all'; render(); return; }
+  const vt = t.closest('[data-vote]'); if (vt) {
+    vt.style.opacity = .6;
+    call('submitVote', who({ voter: VOTER, section: vt.dataset.vote, cand: Number(vt.dataset.g) })).then(() => poll(true)).catch(err => { vt.style.opacity = 1; alert2(err); });
+    return;
+  }
   const rl = t.closest('[data-rl]'); if (rl) {
     const k = rl.dataset.rl, v = rl.dataset.v, c = $('rc_' + k) ? $('rc_' + k).value : '';
     rl.disabled = true; setMsg('rm_' + k, '제출 중...');
@@ -589,6 +622,7 @@ document.addEventListener('input', e => {
 });
 
 /* 팝업 대신 두 번 누르기 */
+function alert2(t) { $('vbox').innerHTML = `<div class="t">${esc(t)}</div><div class="btns"><button class="btn" id="closeV">확인</button></div>`; $('verdict').classList.add('show'); }
 function confirm2(btn, label) {
   if (btn.dataset.armed) return true;
   const old = btn.textContent; btn.dataset.armed = '1'; btn.textContent = label;
