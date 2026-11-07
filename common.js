@@ -37,3 +37,11 @@ const STORY = {
   ],
   note: '점수와 순위는 마지막에 공개한다. 게임 점수는 수행평가 성적과 관계없다.'
 };
+
+/* 투표 후보 순서: 반·구간마다 무작위로 섞되, 같은 반 모든 기기와 칠판에서 같은 순서 */
+function shuffleFor(arr, seed) {
+  let h = 2166136261; for (const ch of seed) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; }
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) { h = (Math.imul(h, 1103515245) + 12345) >>> 0; const j = h % (i + 1); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}

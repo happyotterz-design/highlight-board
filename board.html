@@ -114,7 +114,7 @@ header{display:flex;align-items:center;gap:14px;padding:10px 20px;color:#e8efec;
 <div class="login" id="login"><div class="box"><b>교사 비밀번호</b><input type="password" id="pin" inputmode="numeric" autocomplete="off"><div style="display:flex;gap:8px"><button class="tool red" id="pinOk" style="flex:1">확인</button><button class="tool" id="pinCancel">닫기</button></div><div id="pinMsg" style="color:var(--stamp);margin-top:8px"></div></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="common.js?v=9"></script>
+<script src="common.js?v=10"></script>
 <script>
 let B = null, D = null, pin = sessionGet('case_pin') || '', sel = null, gtab = 1, cardSel = '', revealDone = false;
 let fs = Number(store('case_fs')) || 22;
@@ -207,12 +207,12 @@ function vReview() {
 function partsHTML(parts) { return parts.map(p => p.c ? `<span style="text-decoration:underline 3px var(--ok);text-underline-offset:5px">${esc(p.t)}</span>` : esc(p.t)).join(' '); }
 function vVote() {
   const V = D.vote || { sections: [], tally: {}, voters: 0 };
-  return `<div class="col grid">` + `<div class="paper" style="grid-column:1/-1;display:flex;align-items:center;gap:16px"><h2 style="margin:0">구간별 베스트 투표</h2><span class="muted" style="font-size:.8em">투표한 기기 ${V.voters}대 · 학생 화면에는 모둠 이름 없이 가안·나안으로 보여요</span></div>` +
+  return `<div class="col grid">` + `<div class="paper" style="grid-column:1/-1;display:flex;align-items:center;gap:16px"><h2 style="margin:0">구간별 베스트 투표</h2><span class="muted" style="font-size:.8em">투표한 기기 ${V.voters}대 · 학생 화면에는 모둠 이름 없이 1안·2안으로 섞여 보여요</span></div>` +
     V.sections.map(sec => {
       if (!sec.cands.length) return `<div class="paper"><h2>${esc(sec.name)}</h2><p class="muted">고친 모둠이 없어요 (원문 사용)</p></div>`;
       const max = Math.max(1, ...sec.cands.map(c => V.tally[sec.name + '|' + c.g] || 0));
-      return `<div class="paper"><h2>${esc(sec.name)}</h2>` + sec.cands.map(c => { const n = V.tally[sec.name + '|' + c.g] || 0;
-        return `<div class="cm ${n === max && n ? 'full' : ''}"><div class="m"><b>${c.g}모둠</b> · 👍 ${n}표 <span style="display:inline-block;height:10px;border-radius:5px;background:var(--stamp);width:${120 * n / max}px;margin-left:6px"></span></div>${partsHTML(c.parts)}</div>`; }).join('') + `</div>`;
+      return `<div class="paper"><h2>${esc(sec.name)}</h2>` + shuffleFor(sec.cands, (D.state.cls || '') + '|' + sec.name).map((c, i) => { const n = V.tally[sec.name + '|' + c.g] || 0;
+        return `<div class="cm ${n === max && n ? 'full' : ''}"><div class="m"><b>${i + 1}안</b> <span class="muted">(${c.g}모둠)</span> · 👍 ${n}표 <span style="display:inline-block;height:10px;border-radius:5px;background:var(--stamp);width:${120 * n / max}px;margin-left:6px"></span></div>${partsHTML(c.parts)}</div>`; }).join('') + `</div>`;
     }).join('') + `</div>`;
 }
 

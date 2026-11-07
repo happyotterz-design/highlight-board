@@ -642,7 +642,6 @@ function submitVote(p) {
   const sec = String(p.section || ''), cand = Number(p.cand);
   const c = candidates_(log_(), conf).find(x => x.name === sec);
   need_(c && c.cands.some(x => x.g === cand), '투표할 수 없는 글이에요.');
-  need_(cand !== g, '우리 모둠 글에는 투표할 수 없어요.');
   append_(['vote', g, p.role, voter, '', String(cand), '', '', '', sec, ''], p.who);
   return { ok: true };
 }
