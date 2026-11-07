@@ -23,7 +23,7 @@
  */
 
 const SH = { PHRASE: '표현카드', TEXT: '본문', CONF: '설정', FLAW: '결함', DATA: '자료', CLUE: '단서', ZONE: '복원구역', LOG: '기록' };
-const LOG_HEAD = ['id', '시각', '종류', '모둠', '역할', '문장번호', '고른 문장', '결함 카드', '문제점', '이렇게 바꾸자', '판정', '대상', '숨김'];
+const LOG_HEAD = ['id', '시각', '종류', '모둠', '역할', '문장번호', '고른 문장', '결함 카드', '문제점', '이렇게 바꾸자', '판정', '대상', '숨김', '반'];
 const PHASES = ['브리핑', '1라운드 결함 수사', '2라운드 보고서 복원', '3라운드 상호 심사', '4라운드 내 초안 수사', '결과 공개'];
 const CARDS = [
   ['찬반형 질문', '탐구 질문이 예/아니오로 끝난다'],
@@ -69,7 +69,8 @@ function setupGame() {
     ['모둠 수', 4],
     ['역할 (쉼표로 구분)', '팩트체크,윤리·공정,현실·실행,환경·미래'],
     ['교사 비밀번호', '1234'],
-    ['힌트 감점', 1]
+    ['힌트 감점', 1],
+    ['반 목록 (쉼표로 구분)', '2-1반,2-2반,2-3반,2-4반,2-5반,2-6반']
   ], [160, 420]);
 
   // 문장번호: "구간순서-문장순서" (0부터). 본문을 고치면 여기 번호도 맞춰야 함.
@@ -139,16 +140,17 @@ function setupGame() {
     ['공통', '핵심 단어', '과태료'], ['공통', '핵심 단어', '조건부 운영'], ['공통', '핵심 단어', '생태 보전 기준'], ['공통', '핵심 단어', '정상 탐방로 제한']
   ], [80, 90, 560]);
 
-  make(SH.LOG, [LOG_HEAD], [70, 130, 60, 50, 80, 90, 220, 110, 220, 220, 70, 60, 50]);
-
-  setState_({ phase: 0, reveal: false });
+  const lg = make(SH.LOG, [LOG_HEAD], [70, 130, 60, 50, 80, 90, 220, 110, 220, 220, 70, 60, 50, 60]);
+  if (String(lg.getRange(1, 14).getValue()) !== '반') lg.getRange(1, 14).setValue('반').setFontWeight('bold');   // 예전 기록 탭에 '반' 칸 추가
+  const cf = sheet_(SH.CONF);
+  if (!cf.getDataRange().getValues().some(r => String(r[0]).trim() === '반 목록 (쉼표로 구분)')) cf.appendRow(['반 목록 (쉼표로 구분)', '2-1반,2-2반,2-3반,2-4반,2-5반,2-6반']);
   bustAll_();
 }
 
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('사건파일')
     .addItem('처음 설정 (탭 만들기)', 'setupGame')
-    .addItem('새 게임 시작 (기록 보관 후 비우기)', 'newGame')
+    .addItem('전체 기록 보관 후 비우기', 'newGame')
     .addToUi();
 }
 
@@ -162,7 +164,7 @@ function newGame() {
     copy.setName('기록_보관_' + Utilities.formatDate(new Date(), 'Asia/Seoul', 'MMdd_HHmm'));
     log.getRange(2, 1, log.getLastRow() - 1, LOG_HEAD.length).clearContent();
   }
-  setState_({ phase: 0, reveal: false });
+  saveAll_({ cur: '', by: {} });
   bustAll_();
 }
 
@@ -178,7 +180,8 @@ function doPost(e) {
     const api = {
       boot: boot, state: studentState, submitFind: submitFind, useHint: useHint,
       saveRewrite: saveRewrite, submitReview: submitReview, submitSelf: submitSelf,
-      board: boardState, setPhase: setPhase, toggleHide: toggleHide, checkPin: checkPin
+      board: boardState, setPhase: setPhase, toggleHide: toggleHide, checkPin: checkPin,
+      admin: admin, openClass: openClass, addClass: addClass, resetClass: resetClass, setHidden: setHidden
     };
     if (!api[req.fn]) throw new Error('알 수 없는 요청입니다.');
     out = { ok: true, data: api[req.fn].apply(null, req.args || []) };
@@ -209,7 +212,8 @@ function conf0_() {
     groups: Number(c['모둠 수']) || 4,
     roles: String(c['역할 (쉼표로 구분)'] || '').split(',').map(s => s.trim()).filter(Boolean),
     pin: String(c['교사 비밀번호'] || ''),
-    hintCost: Number(c['힌트 감점'] || 1)
+    hintCost: Number(c['힌트 감점'] || 1),
+    classes: keyStr_(c['반 목록 (쉼표로 구분)'] || '2-1반,2-2반,2-3반,2-4반,2-5반,2-6반').split(',').map(s => s.trim()).filter(Boolean)
   };
 }
 
@@ -239,29 +243,41 @@ function clues_() { return cached_('clues', () => { const o = {}; rows_(SH.CLUE)
 function phrases_() { return cached_('phrases', () => rows_(SH.PHRASE).filter(r => String(r[2]).trim()).map(r => ({ section: String(r[0]).trim(), kind: String(r[1]).trim(), text: String(r[2]) }))); }
 function zones_() { return cached_('zones', () => { const o = {}; rows_(SH.ZONE).forEach(r => o[Number(r[0])] = String(r[1]).split(',').map(s => s.trim()).filter(Boolean)); return o; }); }
 
-/* 상태(라운드)는 스크립트 속성에 */
-function getState_() {
-  const c = CacheService.getScriptCache().get('state');
+/* 상태(라운드)는 반별로 스크립트 속성에 저장: { cur: '2-2반', by: { '2-2반': { phase, reveal, at } } } */
+function allState_() {
+  const cache = CacheService.getScriptCache(), c = cache.get('state');
   if (c) return JSON.parse(c);
   const p = PropertiesService.getScriptProperties().getProperty('state');
-  const s = p ? JSON.parse(p) : { phase: 0, reveal: false };
-  CacheService.getScriptCache().put('state', JSON.stringify(s), 60);
+  let s = p ? JSON.parse(p) : {};
+  if (!s.by) s = { cur: '', by: {} };            // 예전 형식이면 새로 시작
+  cache.put('state', JSON.stringify(s), 60);
   return s;
 }
-function setState_(s) {
+function saveAll_(s) {
   PropertiesService.getScriptProperties().setProperty('state', JSON.stringify(s));
   CacheService.getScriptCache().put('state', JSON.stringify(s), 60);
 }
+function curCls_() { return allState_().cur || ''; }
+function getState_() {
+  const s = allState_(), one = s.by[s.cur] || { phase: 0, reveal: false };
+  return { cls: s.cur || '', phase: one.phase || 0, reveal: !!one.reveal, at: one.at || 0 };
+}
+function setState_(one) {
+  const s = allState_();
+  s.by[s.cur || ''] = { phase: one.phase || 0, reveal: !!one.reveal, at: one.at || Date.now() };
+  saveAll_(s);
+}
 
 /* 기록 읽기 (3초 캐시) */
-function log_() {
+function log_() { const c = curCls_(); return logAll_().filter(e => e.cls === c); }
+function logAll_() {
   const cache = CacheService.getScriptCache();
   const hit = cache.get('log');
   if (hit) return JSON.parse(hit);
   const list = rows_(SH.LOG).filter(r => r[0] && String(r[12]).trim() === '').map(r => ({
     id: String(r[0]), time: r[1] instanceof Date ? r[1].getTime() : 0, type: String(r[2]), group: Number(r[3]), role: String(r[4]),
     keys: keyStr_(r[5]).split(',').filter(Boolean), quote: String(r[6]), card: String(r[7]), problem: String(r[8]), fix: String(r[9]),
-    result: String(r[10]), target: String(r[11])
+    result: String(r[10]), target: String(r[11]), cls: keyStr_(r[13] == null ? '' : r[13]).trim()
   }));
   try { cache.put('log', JSON.stringify(list), 3); } catch (e) {}
   return list;
@@ -275,7 +291,7 @@ function append_(row) {
   try {
     const id = Utilities.getUuid().slice(0, 8);
     const log = sheet_(SH.LOG);
-    log.appendRow([id, new Date()].concat(row.map(v => typeof v === 'string' && /^\d+-\d+$/.test(v) ? "'" + v : v)));
+    log.appendRow([id, new Date()].concat(row.slice(0, 11), [curCls_()]).map(v => typeof v === 'string' && /^\d+-\d+$/.test(v) ? "'" + v : v));
     bust_();
     return id;
   } finally { lock.releaseLock(); }
@@ -288,6 +304,7 @@ function keyStr_(v) {
 }
 
 function need_(cond, msg) { if (!cond) throw new Error(msg); }
+function needClass_() { need_(curCls_(), '선생님이 아직 반을 열지 않았어요.'); }
 function checkGroupRole_(g, role, conf) {
   need_(g >= 1 && g <= conf.groups, '모둠을 다시 골라 주세요.');
   need_(conf.roles.indexOf(role) >= 0, '역할을 다시 골라 주세요.');
@@ -405,6 +422,7 @@ function classCards_(log, flaws) {
 }
 
 function submitFind(p) {
+  needClass_();
   const st = getState_(); need_(st.phase === 1, '지금은 결함 수사 시간이 아니에요.');
   const conf = conf_(); const g = Number(p.group); checkGroupRole_(g, p.role, conf);
   const keys = (p.keys || []).map(String).filter(k => /^\d+-\d+$/.test(k)).slice(0, 8);
@@ -454,6 +472,7 @@ function sentenceOf_(k) {
 }
 
 function useHint(p) {
+  needClass_();
   const st = getState_(); need_(st.phase === 1, '힌트는 결함 수사 시간에만 쓸 수 있어요.');
   const conf = conf_(); const g = Number(p.group); checkGroupRole_(g, p.role, conf);
   const flaws = flaws_();
@@ -470,6 +489,7 @@ function useHint(p) {
 }
 
 function saveRewrite(p) {
+  needClass_();
   const st = getState_(); need_(st.phase === 2, '지금은 보고서 복원 시간이 아니에요.');
   const conf = conf_(); const g = Number(p.group); checkGroupRole_(g, p.role, conf);
   const zone = zones_()[g] || [];
@@ -489,6 +509,7 @@ function saveRewrite(p) {
 
 const REVIEW_CHECKS = ['출처를 위치까지 밝혔다', '해석에 의미와 전문가 관점이 있다', '원래 결함이 고쳐졌다'];
 function submitReview(p) {
+  needClass_();
   const st = getState_(); need_(st.phase === 3, '지금은 상호 심사 시간이 아니에요.');
   const conf = conf_(); const g = Number(p.group); checkGroupRole_(g, p.role, conf);
   const t = Number(p.target);
@@ -501,6 +522,7 @@ function submitReview(p) {
 }
 
 function submitSelf(p) {
+  needClass_();
   const st = getState_(); need_(st.phase === 4, '지금은 내 초안 수사 시간이 아니에요.');
   const conf = conf_(); const g = Number(p.group); checkGroupRole_(g, p.role, conf);
   need_(CARDS.some(c => c[0] === p.card), '결함 카드를 하나 골라 주세요.');
@@ -517,6 +539,7 @@ function checkPin(pin) { return pinOk_(pin); }
 
 function setPhase(pin, phase, reveal) {
   need_(pinOk_(pin), '비밀번호가 맞지 않아요.');
+  needClass_();
   phase = Math.max(0, Math.min(PHASES.length - 1, Number(phase)));
   setState_({ phase, reveal: phase === PHASES.length - 1 ? !!reveal : false, at: Date.now() });
   return getState_();
@@ -528,6 +551,69 @@ function toggleHide(pin, id) {
   const ids = s.getRange(2, 1, Math.max(1, s.getLastRow() - 1), 1).getValues();
   for (let i = 0; i < ids.length; i++) if (String(ids[i][0]) === String(id)) {
     s.getRange(i + 2, 13).setValue('교사 숨김'); bust_(); return true;
+  }
+  return false;
+}
+
+/* ---------- 교사 관리 ---------- */
+function admin(pin) {
+  need_(pinOk_(pin), '비밀번호가 맞지 않아요.');
+  const conf = conf_(), cur = curCls_(), all = allState_();
+  const raw = rows_(SH.LOG).filter(r => r[0]).map(r => ({
+    id: String(r[0]), time: r[1] instanceof Date ? r[1].getTime() : 0, type: String(r[2]), group: Number(r[3]), role: String(r[4]),
+    card: String(r[7]), problem: String(r[8]), fix: String(r[9]), result: String(r[10]), target: String(r[11]),
+    hidden: String(r[12]).trim() !== '', cls: keyStr_(r[13] == null ? '' : r[13]).trim()
+  }));
+  const names = conf.classes.slice();
+  raw.forEach(e => { if (e.cls && names.indexOf(e.cls) < 0) names.push(e.cls); });
+  return {
+    cur,
+    classes: names.map(n => ({ name: n, count: raw.filter(e => e.cls === n && !e.hidden).length, phase: (all.by[n] || {}).phase || 0 })),
+    records: raw.filter(e => e.cls === cur).reverse().slice(0, 400)
+  };
+}
+
+function openClass(pin, name) {
+  need_(pinOk_(pin), '비밀번호가 맞지 않아요.');
+  name = String(name || '').trim(); need_(name, '반 이름이 없어요.');
+  const s = allState_(); s.cur = name; if (!s.by[name]) s.by[name] = { phase: 0, reveal: false, at: Date.now() };
+  saveAll_(s); bust_();
+  return getState_();
+}
+
+function addClass(pin, name) {
+  need_(pinOk_(pin), '비밀번호가 맞지 않아요.');
+  name = String(name || '').trim().slice(0, 20); need_(name && name.indexOf(',') < 0, '반 이름을 확인해 주세요.');
+  const conf = conf0_();
+  if (conf.classes.indexOf(name) < 0) {
+    const sh = sheet_(SH.CONF), vals = sh.getDataRange().getValues();
+    const list = conf.classes.concat([name]).join(',');
+    const i = vals.findIndex(r => String(r[0]).trim() === '반 목록 (쉼표로 구분)');
+    if (i >= 0) sh.getRange(i + 1, 2).setValue(list); else sh.appendRow(['반 목록 (쉼표로 구분)', list]);
+    CacheService.getScriptCache().remove('conf');
+  }
+  return true;
+}
+
+function resetClass(pin) {
+  need_(pinOk_(pin), '비밀번호가 맞지 않아요.');
+  const cur = curCls_(); need_(cur, '열린 반이 없어요.');
+  const sh = sheet_(SH.LOG), n = sh.getLastRow() - 1;
+  if (n > 0) {
+    const vals = sh.getRange(2, 1, n, LOG_HEAD.length).getValues();
+    vals.forEach((r, i) => { if (r[0] && keyStr_(r[13] == null ? '' : r[13]).trim() === cur && String(r[12]).trim() === '') sh.getRange(i + 2, 13).setValue('초기화'); });
+  }
+  setState_({ phase: 0, reveal: false, at: Date.now() });
+  bust_();
+  return true;
+}
+
+function setHidden(pin, id, hide) {
+  need_(pinOk_(pin), '비밀번호가 맞지 않아요.');
+  const s = sheet_(SH.LOG);
+  const ids = s.getRange(2, 1, Math.max(1, s.getLastRow() - 1), 1).getValues();
+  for (let i = 0; i < ids.length; i++) if (String(ids[i][0]) === String(id)) {
+    s.getRange(i + 2, 13).setValue(hide ? '교사 숨김' : ''); bust_(); return true;
   }
   return false;
 }

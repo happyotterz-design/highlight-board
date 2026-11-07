@@ -130,7 +130,7 @@ textarea{resize:vertical;min-height:58px}
 <div class="sheet" id="sheet"><div class="inner" id="sheetInner"></div></div>
 <div class="verdict" id="verdict"><div class="vbox" id="vbox"></div></div>
 
-<script src="common.js?v=2"></script>
+<script src="common.js?v=3"></script>
 <script>
 let B = null;              // boot: 글, 카드, 단서, 구역
 let S = null;              // 우리 모둠 상태
@@ -148,7 +148,8 @@ function secName(k) { return B.sections[Number(k.split('-')[0])]?.name || ''; }
 function renderTop() {
   $('code').textContent = STORY.code;
   $('title').textContent = STORY.title;
-  $('me').innerHTML = me.group ? `<button class="badge" id="change">${me.group}모둠 · ${esc(me.role)}</button>` : '';
+  const cls = S && S.state.cls ? `<span class="badge" style="background:var(--gold)">${esc(S.state.cls)}</span>` : '';
+  $('me').innerHTML = cls + (me.group ? `<button class="badge" id="change">${me.group}모둠 · ${esc(me.role)}</button>` : '');
   $('steps').innerHTML = B.phases.map((p, i) => `<span class="${i === phase() ? 'on' : i < phase() ? 'done' : ''}">${esc(p)}</span>`).join('');
 }
 
@@ -170,7 +171,7 @@ function renderBrief() {
     <div class="paper"><h2>네 가지 임무</h2><div class="mission">${STORY.missions.map((m, i) => `<b>0${i + 1}</b><div><strong>${esc(m[0])}</strong> ${esc(m[1])}</div>`).join('')}</div></div>
     <div class="paper"><h2>내 비밀 단서</h2>${clueHTML()}<p class="muted" style="margin-top:8px">단서는 모둠 친구들에게 말로 알려 줘도 됩니다. 단, 화면을 보여 주지는 마세요.</p></div>
     <div class="paper"><h2>점수 규칙</h2><table class="pts">${STORY.points.map(p => `<tr><td>${esc(p[0])}</td><td>${p[1]}</td></tr>`).join('')}</table><p class="muted">${esc(STORY.note)}</p></div>
-    <div class="wait">선생님이 수사를 시작하면 화면이 저절로 바뀝니다.</div>`;
+    <div class="wait">${S && S.state.cls ? esc(S.state.cls) + ' 수사팀 대기 중. 선생님이 수사를 시작하면 화면이 저절로 바뀝니다.' : '선생님이 반을 열면 시작해요.'}</div>`;
 }
 
 /* ---------- 1 결함 수사 ---------- */
@@ -369,7 +370,8 @@ function poll(force) {
   if (!me.group) return Promise.resolve();
   return call('state', me.group).then(st => {
     const sig = JSON.stringify(st);
-    const phaseChanged = !S || S.state.phase !== st.state.phase;
+    const phaseChanged = !S || S.state.phase !== st.state.phase || S.state.cls !== st.state.cls;
+    if (store('case_cls') !== st.state.cls) { draft = {}; store('case_draft', draft); store('case_cls', st.state.cls); }
     S = st;
     if (phaseChanged) { picked.clear(); card = ''; tab = 'report'; window.scrollTo(0, 0); }
     if (force || phaseChanged || (sig !== lastSig && !typing())) render();

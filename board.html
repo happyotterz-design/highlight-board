@@ -81,6 +81,20 @@ header{display:flex;align-items:center;gap:14px;padding:10px 20px;color:#e8efec;
 .login input{width:100%;font-size:20px;padding:10px;border:2px solid var(--rule);border-radius:9px;margin:10px 0}
 .qr{background:#fff;padding:12px;border-radius:12px;display:inline-block}
 .url{font-family:var(--mono);font-size:.7em;word-break:break-all;margin-top:8px}
+.clsbadge{background:var(--paper);color:var(--ink);font-weight:700;border-radius:8px;padding:5px 12px;font-size:17px}
+.cls{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.cls button{padding:14px 8px;border-radius:10px;border:2px solid var(--rule);background:#fff;font-size:18px;font-weight:700;cursor:pointer;line-height:1.3}
+.cls button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.cls button small{display:block;font-size:12px;font-weight:400;opacity:.8}
+.adm h3{font-size:16px;margin:16px 0 8px}
+.adm table{width:100%;border-collapse:collapse;font-size:14px}
+.adm td,.adm th{border-bottom:1px solid var(--rule);padding:6px 5px;text-align:left;vertical-align:top}
+.adm tr.hid td{color:#9aa;text-decoration:line-through}
+.adm select,.adm input[type=text]{font-size:15px;padding:6px 8px;border:1.5px solid var(--rule);border-radius:7px}
+.adm input[type=checkbox]{width:auto;margin:0 4px 0 0;vertical-align:middle}
+.adm td:nth-child(2){white-space:nowrap}
+.sbtn{font-size:13px;border:1px solid var(--rule);background:#fff;border-radius:6px;padding:3px 9px;cursor:pointer;white-space:nowrap}
+.sbtn.red{background:var(--stamp);color:#fff;border-color:var(--stamp)}
 </style>
 </head>
 <body>
@@ -92,13 +106,15 @@ header{display:flex;align-items:center;gap:14px;padding:10px 20px;color:#e8efec;
   <button class="tool" id="prev" hidden>◀ 이전</button>
   <button class="tool red" id="next" hidden>다음 단계 ▶</button>
   <button class="tool" id="minus">가-</button><button class="tool" id="plus">가+</button>
+  <button class="tool" id="adminBtn" hidden>반·기록 관리</button>
   <button class="tool" id="loginBtn">교사 로그인</button>
 </header>
 <div class="wrap" id="wrap"><div class="col" style="flex:1;color:#c9d6d1">불러오는 중...</div></div>
+<div class="login" id="admin"><div class="box" style="width:min(1100px,94vw);max-height:90vh;overflow:auto;font-size:16px" id="adminBox"></div></div>
 <div class="login" id="login"><div class="box"><b>교사 비밀번호</b><input type="password" id="pin" inputmode="numeric" autocomplete="off"><div style="display:flex;gap:8px"><button class="tool red" id="pinOk" style="flex:1">확인</button><button class="tool" id="pinCancel">닫기</button></div><div id="pinMsg" style="color:var(--stamp);margin-top:8px"></div></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="common.js?v=2"></script>
+<script src="common.js?v=3"></script>
 <script>
 let B = null, D = null, pin = sessionGet('case_pin') || '', sel = null, gtab = 1, cardSel = '', revealDone = false;
 let fs = Number(store('case_fs')) || 22;
@@ -113,11 +129,11 @@ function secName(k) { return B.sections[Number(k.split('-')[0])]?.name || ''; }
 
 function renderHeader() {
   document.documentElement.style.setProperty('--fs', fs + 'px');
-  $('code').textContent = STORY.code;
   $('title').textContent = STORY.title + ' · 수사 상황판';
   $('steps').className = 'steps' + (teacher() ? ' t' : '');
   $('steps').innerHTML = B.phases.map((p, i) => `<span class="${i === phase() ? 'on' : ''}" data-ph="${i}">${i + 1}. ${esc(p)}</span>`).join('');
-  $('prev').hidden = $('next').hidden = !teacher();
+  $('prev').hidden = $('next').hidden = $('adminBtn').hidden = !teacher();
+  $('code').innerHTML = esc(STORY.code) + (D.state.cls ? ` <span class="clsbadge">${esc(D.state.cls)} 진행 중</span>` : ' <span class="clsbadge" style="background:var(--gold);color:#fff">반을 열어 주세요</span>');
   $('loginBtn').textContent = teacher() ? '교사 모드' : '교사 로그인';
 }
 
@@ -209,11 +225,45 @@ function render() {
   if (!B || !D) return;
   renderHeader();
   const keep = [...document.querySelectorAll('.col')].map(c => c.scrollTop);
+  if (!D.state.cls) { $('wrap').innerHTML = `<div class="col" style="flex:1;display:flex;align-items:center;justify-content:center;color:#e8efec;font-size:1.1em;text-align:center">아직 열린 반이 없어요.<br>교사 로그인 → 반·기록 관리에서 오늘 수업할 반을 열어 주세요.</div>`; return; }
   $('wrap').innerHTML = [vBrief, vFind, vRewrite, vReview, vSelf, vResult][phase()]();
   document.querySelectorAll('.col').forEach((c, i) => { if (keep[i]) c.scrollTop = keep[i]; });
   if (phase() === 0 && window.QRCode && $('qr')) new QRCode($('qr'), { text: studentURL, width: 220, height: 220 });
   if (phase() === 5 && D.result && !revealDone) runReveal();
 }
+
+/* ---------- 반·기록 관리 ---------- */
+let A = null, aType = '', aGroup = 0, aHidden = false;
+const TYPE_NAME = { find: '결함 수사', hint: '힌트', rewrite: '복원 글', review: '심사', self: '내 초안' };
+function openAdmin() { $('admin').classList.add('show'); loadAdmin(); }
+function loadAdmin() { return call('admin', pin).then(a => { A = a; renderAdmin(); }).catch(err => { $('adminBox').innerHTML = esc(err); }); }
+function summary(e) {
+  if (e.type === 'find') return `${e.card}${e.problem ? ' · ' + e.problem : ''} <span class="muted">(${e.result.split(':')[0] === 'full' ? '정답' : e.result.split(':')[0] === 'part' ? '문장만' : '기록'})</span>`;
+  if (e.type === 'hint') return esc(e.problem);
+  if (e.type === 'rewrite') return `<b>${esc(e.target)}</b> ${esc(e.fix.slice(0, 80))}${e.fix.length > 80 ? '…' : ''}`;
+  if (e.type === 'review') return `${esc(e.target)}모둠 심사 · 체크 ${String(e.card).split(',').filter(Boolean).length}개 · ${esc(e.problem)}`;
+  if (e.type === 'self') return `${esc(e.card)} · ${esc(e.problem)} → ${esc(e.fix)}`;
+  return '';
+}
+function renderAdmin() {
+  if (!A) return;
+  const rec = A.records.filter(e => (!aType || e.type === aType) && (!aGroup || e.group === aGroup) && (aHidden || !e.hidden));
+  const groups = B.groups || 4;
+  $('adminBox').innerHTML = `<div class="adm"><div style="display:flex;align-items:center"><b style="font-size:20px;font-family:var(--display)">반·기록 관리</b><button class="tool" id="adminClose" style="margin-left:auto;background:#fff;color:var(--ink)">닫기</button></div>
+    <h3>오늘 수업할 반 열기</h3><p class="muted" style="font-size:13px;margin:0 0 8px">반을 열면 학생 태블릿은 그 반 게임으로 바뀝니다. 반마다 기록과 진행 단계가 따로 저장돼서, 나중에 다시 열면 그 반 결과를 그대로 볼 수 있어요.</p>
+    <div class="cls">${A.classes.map(c => `<button data-cls="${esc(c.name)}" class="${c.name === A.cur ? 'on' : ''}">${esc(c.name)}<small>기록 ${c.count}개 · ${esc(B.phases[c.phase] || '')}</small></button>`).join('')}</div>
+    <div style="display:flex;gap:6px;margin-top:8px"><input type="text" id="newCls" placeholder="반 추가 (예: 2-7반)" maxlength="20"><button class="sbtn" id="addCls">추가</button></div>
+    ${A.cur ? `<h3>${esc(A.cur)} 관리</h3><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="sbtn" id="toBrief">브리핑 단계로 되돌리기</button><button class="sbtn red" id="resetCls">${esc(A.cur)} 기록 모두 지우고 처음부터</button></div>
+    <p class="muted" style="font-size:13px">지운 기록은 시트의 기록 탭에 '초기화'/'교사 숨김'으로 남아 있어서, 아래 목록에서 '지운 것도 보기'를 켜면 되살릴 수 있어요.</p>
+    <h3>${esc(A.cur)} 기록 ${rec.length}개</h3>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+      <select id="aType"><option value="">모든 종류</option>${Object.keys(TYPE_NAME).map(k => `<option value="${k}" ${aType === k ? 'selected' : ''}>${TYPE_NAME[k]}</option>`).join('')}</select>
+      <select id="aGroup"><option value="0">모든 모둠</option>${Array.from({ length: groups }, (_, i) => `<option value="${i + 1}" ${aGroup === i + 1 ? 'selected' : ''}>${i + 1}모둠</option>`).join('')}</select>
+      <label style="font-size:14px"><input type="checkbox" id="aHidden" ${aHidden ? 'checked' : ''}> 지운 것도 보기</label></div>
+    <table><tr><th>시각</th><th>모둠</th><th>종류</th><th>내용</th><th></th></tr>${rec.map(e => `<tr class="${e.hidden ? 'hid' : ''}"><td>${e.time ? new Date(e.time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''}</td><td>${e.group}모둠<br><span class="muted">${esc(e.role)}</span></td><td>${TYPE_NAME[e.type] || esc(e.type)}</td><td>${summary(e)}</td>
+      <td>${e.hidden ? `<button class="sbtn" data-unhide="${esc(e.id)}">되살리기</button>` : `<button class="sbtn" data-del="${esc(e.id)}">지우기</button>`}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">기록이 없어요.</td></tr>'}</table>` : '<p class="muted">위에서 반을 먼저 열어 주세요.</p>'}</div>`;
+}
+function adminAct(p) { return p.then(() => Promise.all([loadAdmin(), poll(true)])).catch(err => alertBar(err)); }
 
 function runReveal() {
   revealDone = true;
@@ -225,7 +275,7 @@ let lastSig = '';
 function poll(force) {
   return call('board', pin).then(d => {
     const sig = JSON.stringify(d);
-    if (D && D.state.phase !== d.state.phase) { sel = null; cardSel = ''; }
+    if (D && (D.state.phase !== d.state.phase || D.state.cls !== d.state.cls)) { sel = null; cardSel = ''; if (D.state.cls !== d.state.cls) revealDone = false; }
     const changed = sig !== lastSig; D = d; lastSig = sig;
     if (force || changed) render();
   }).catch(err => { if (!D) $('wrap').innerHTML = `<div class="col" style="color:#fff">연결하지 못했어요: ${esc(err)}</div>`; });
@@ -249,16 +299,35 @@ document.addEventListener('click', e => {
   if (t.id === 'reveal') { revealDone = false; return go(5, true); }
   if (t.id === 'plus') { fs = Math.min(40, fs + 2); store('case_fs', fs); render(); return; }
   if (t.id === 'minus') { fs = Math.max(14, fs - 2); store('case_fs', fs); render(); return; }
+  if (t.id === 'adminBtn') return openAdmin();
+  if (t.id === 'adminClose') { $('admin').classList.remove('show'); return; }
+  const cl = t.closest('[data-cls]'); if (cl) { if (cl.dataset.cls === A.cur) return; if (!confirm2(cl, cl.dataset.cls + ' 열기?')) return; revealDone = false; return adminAct(call('openClass', pin, cl.dataset.cls)); }
+  if (t.id === 'addCls') { const v = $('newCls').value.trim(); if (v) adminAct(call('addClass', pin, v)); return; }
+  if (t.id === 'toBrief') { if (!confirm2(t, '한 번 더 누르면 브리핑으로')) return; return adminAct(call('setPhase', pin, 0, false)); }
+  if (t.id === 'resetCls') { if (!confirm2(t, '정말 지울까요? 한 번 더 누르세요')) return; revealDone = false; return adminAct(call('resetClass', pin)); }
+  const dl = t.closest('[data-del]'); if (dl) return adminAct(call('setHidden', pin, dl.dataset.del, true));
+  const uh = t.closest('[data-unhide]'); if (uh) return adminAct(call('setHidden', pin, uh.dataset.unhide, false));
   if (t.id === 'loginBtn') { $('login').classList.add('show'); $('pin').focus(); return; }
   if (t.id === 'pinCancel') { $('login').classList.remove('show'); return; }
   if (t.id === 'pinOk') {
     const v = $('pin').value;
     call('checkPin', v).then(ok => {
       if (!ok) { $('pinMsg').textContent = '비밀번호가 맞지 않아요.'; return; }
-      pin = v; sessionSet('case_pin', v); $('login').classList.remove('show'); poll(true);
+      pin = v; sessionSet('case_pin', v); $('login').classList.remove('show'); poll(true).then(() => { if (!D.state.cls) openAdmin(); });
     });
   }
 });
+document.addEventListener('change', e => {
+  if (e.target.id === 'aType') { aType = e.target.value; renderAdmin(); }
+  if (e.target.id === 'aGroup') { aGroup = Number(e.target.value); renderAdmin(); }
+  if (e.target.id === 'aHidden') { aHidden = e.target.checked; renderAdmin(); }
+});
+function confirm2(btn, label) {
+  if (btn.dataset.armed) return true;
+  const old = btn.innerHTML; btn.dataset.armed = '1'; btn.textContent = label;
+  setTimeout(() => { if (btn.isConnected) { delete btn.dataset.armed; btn.innerHTML = old; } }, 3000);
+  return false;
+}
 $('pin').addEventListener('keydown', e => { if (e.key === 'Enter') $('pinOk').click(); });
 
 /* 단계 시간 */
