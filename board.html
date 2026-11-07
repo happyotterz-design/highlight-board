@@ -114,7 +114,7 @@ header{display:flex;align-items:center;gap:14px;padding:10px 20px;color:#e8efec;
 <div class="login" id="login"><div class="box"><b>교사 비밀번호</b><input type="password" id="pin" inputmode="numeric" autocomplete="off"><div style="display:flex;gap:8px"><button class="tool red" id="pinOk" style="flex:1">확인</button><button class="tool" id="pinCancel">닫기</button></div><div id="pinMsg" style="color:var(--stamp);margin-top:8px"></div></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="common.js?v=4"></script>
+<script src="common.js?v=5"></script>
 <script>
 let B = null, D = null, pin = sessionGet('case_pin') || '', sel = null, gtab = 1, cardSel = '', revealDone = false;
 let fs = Number(store('case_fs')) || 22;
@@ -172,28 +172,35 @@ function vFind() {
   return `<div class="col paper" style="flex:1.5;margin:0">${text}</div><div class="col" style="flex:1">${side}</div>`;
 }
 
-/* 2 복원 진행 */
+/* 2 복원 진행: 모둠별 글 전체 */
 function vRewrite() {
   return `<div class="col grid">` + Object.keys(D.progress).map(g => {
-    const zone = B.zones[g] || []; const rw = D.rewrites[g] || {};
-    return `<div class="paper"><h2>${g}모둠 · ${esc(zone.join(', '))} <span class="status ${D.progress[g].rewrite ? '' : 'no'}">${D.progress[g].rewrite ? '저장됨' : '작성 중'}</span></h2>` +
-      zone.map(n => `<h3>${esc(n)}</h3>${rw[n] ? `<div class="rw">${esc(rw[n].text)}</div>` : `<div class="orig">아직 저장된 글이 없어요.</div>`}`).join('') + `</div>`;
+    const ch = D.changes[g] || [], es = D.essays[g] || [];
+    const changedSecs = new Set(ch.map(c => c.sec));
+    return `<div class="paper"><h2>${g}모둠 <span class="status ${ch.length ? '' : 'no'}">고친 문장 ${ch.length}개</span></h2>` +
+      es.map(s => `<h3>${esc(s.name)} ${changedSecs.has(s.name) ? '<span class="status">· 고침</span>' : ''}</h3><div class="${changedSecs.has(s.name) ? 'rw' : 'orig'}">${esc(s.text)}</div>`).join('') + `</div>`;
   }).join('') + `</div>`;
 }
 
-/* 3 상호 심사 */
+/* 3 상호 심사: 고친 문장별 판정 */
 function vReview() {
   const groups = Object.keys(D.progress).map(Number);
   if (groups.indexOf(gtab) < 0) gtab = groups[0];
-  const zone = B.zones[gtab] || []; const rw = D.rewrites[gtab] || {};
-  const got = D.reviews.filter(r => r.target === gtab);
-  const last = {}; got.forEach(r => last[r.group] = r);
-  const rs = Object.values(last);
-  return `<div class="col" style="flex:1.6"><div class="gtabs">${groups.map(g => `<button data-gt="${g}" class="${g === gtab ? 'on' : ''}">${g}모둠 복원본</button>`).join('')}</div>` +
-    zone.map(n => { const s = B.sections.find(x => x.name === n); return `<div class="paper"><h2>${esc(n)}</h2><div class="orig">원문: ${esc(s ? s.sentences.join(' ') : '')}</div><h3>복원본</h3>${rw[n] ? `<div class="rw">${esc(rw[n].text)}</div>` : '<div class="orig">저장된 글이 없어요.</div>'}</div>`; }).join('') +
-    `</div><div class="col" style="flex:1"><div class="paper"><h2>받은 심사 ${rs.length} / ${groups.length - 1}</h2>${D.reviewChecks.map((c, i) => { const n = rs.filter(r => r.checks.indexOf(i) >= 0).length; return `<div class="bar"><span style="flex:1">${esc(c)}</span><b>${n}</b></div>`; }).join('')}</div>
-      <div class="paper"><h2>한 줄 평</h2>${rs.map(r => `<div class="cm"><div class="m">${r.group}모둠 심사</div>${esc(r.comment)}</div>`).join('') || '<p class="muted">아직 없어요.</p>'}</div>
-      <div class="paper"><h2>심사 진행</h2>${groups.map(g => `<div class="bar"><span style="width:60px">${g}모둠</span><span>${D.progress[g].reviews} / ${groups.length - 1}개 심사함</span></div>`).join('')}</div></div>`;
+  const ch = D.changes[gtab] || [];
+  const rl = D.rlines.filter(r => r.target === gtab);
+  const reviewer = groups.find(g => g % groups.length + 1 === gtab);
+  const all = D.reviews.filter(r => r.target === gtab).pop();
+  return `<div class="col" style="flex:1.7"><div class="gtabs">${groups.map(g => `<button data-gt="${g}" class="${g === gtab ? 'on' : ''}">${g}모둠 복원본</button>`).join('')}</div>
+      <div class="paper"><h2>${gtab}모둠이 고친 문장 ${ch.length}개 <span class="muted">· 심사: ${reviewer}모둠</span></h2>` +
+    (ch.map(c => { const v = rl.filter(r => r.key === c.key); const ok = v.filter(x => x.verdict === 'ok').length, no = v.filter(x => x.verdict === 'no').length;
+      return `<div class="cm ${ok ? 'full' : no ? 'part' : ''}"><div class="m">${esc(c.sec)} · ${esc(c.who || '')}(${esc(c.role)}) ${v.length ? `· ${ok ? '👍 타당해요' : '🤔 아쉬워요'}` : '· 심사 전'}</div>
+        ${c.added ? '' : `<div style="color:var(--ink-soft);${c.del ? 'text-decoration:line-through' : ''}">${esc(c.orig)}</div>`}
+        ${c.del ? '' : `<div style="margin-top:4px">→ <b>${esc(c.text)}</b></div>`}
+        <div class="m" style="margin-top:4px">바꾼 이유: ${esc(c.reason || '')}</div>${v.filter(x => x.comment).map(x => `<div class="m">심사 한마디: “${esc(x.comment)}”</div>`).join('')}</div>`; }).join('') || '<p class="muted">아직 고친 문장이 없어요.</p>') +
+    `</div></div><div class="col" style="flex:1"><div class="paper"><h2>심사 결과</h2><div class="bar"><span style="flex:1">👍 타당해요</span><b>${rl.filter(x => x.verdict === 'ok').length}</b></div><div class="bar"><span style="flex:1">🤔 아쉬워요</span><b>${rl.filter(x => x.verdict === 'no').length}</b></div>
+      <div class="bar"><span style="flex:1">심사 안 한 문장</span><b>${ch.length - rl.length}</b></div></div>
+      <div class="paper"><h2>${reviewer}모둠의 한 줄 평</h2>${all ? `<div class="cm">${esc(all.comment)}</div>` : '<p class="muted">아직 없어요.</p>'}</div>
+      <div class="paper"><h2>심사 진행</h2>${groups.map(g => `<div class="bar"><span style="width:150px">${g}모둠 → ${g % groups.length + 1}모둠</span><span>${D.progress[g].reviews} / ${D.progress[g].toReview}</span></div>`).join('')}</div></div>`;
 }
 
 /* 4 내 초안 수사 */
@@ -216,8 +223,8 @@ function vResult() {
   }
   const R = D.result;
   const order = R.rank.map((r, i) => ({ ...r, place: i + 1 }));
-  return `<div class="col" style="flex:1"><div class="paper"><h2>최종 순위 <span class="muted">만점 ${R.max}점</span></h2><div id="ranks">${order.map(r => `<div class="rank ${r.place === 1 ? 'first' : ''} ${revealDone ? 'in' : ''}" data-place="${r.place}"><span class="no">${r.place}위</span><div><b>${r.group}모둠</b> · ${r.total}점<div class="det">결함 ${r.flawsFound}개 · 발견 ${r.find} · 역할 보너스 ${r.bonus} · 심사 ${r.review} · 힌트 −${r.hint}</div></div><span class="gr">${esc(r.grade)}</span></div>`).join('')}</div></div></div>
-    <div class="col" style="flex:1.2"><div class="paper"><h2>복원된 보고서</h2>${R.restored.map(s => `<h3>${esc(s.name)} ${s.by ? `<span class="status">· ${s.by}모둠 복원</span>` : ''}</h3><div class="rw">${esc(s.text)}</div>`).join('')}</div>
+  return `<div class="col" style="flex:1"><div class="paper"><h2>최종 순위 <span class="muted">만점 ${R.max}점</span></h2><div id="ranks">${order.map(r => `<div class="rank ${r.place === 1 ? 'first' : ''} ${revealDone ? 'in' : ''}" data-place="${r.place}"><span class="no">${r.place}위</span><div><b>${r.group}모둠</b> · ${r.total}점<div class="det">결함 ${r.flawsFound}개 · 발견 ${r.find} · 역할 보너스 ${r.bonus} · 타당해요 ${r.review} · 힌트 −${r.hint}</div></div><span class="gr">${esc(r.grade)}</span></div>`).join('')}</div></div></div>
+    <div class="col" style="flex:1.2"><div class="paper"><h2>복원된 보고서</h2>${R.restored.map(s => `<h3>${esc(s.name)} ${s.by ? `<span class="status">· ${s.by}모둠 복원${s.ok ? ' · 👍 ' + s.ok : ''}</span>` : '<span class="muted">· 원문</span>'}</h3><div class="rw">${esc(s.text)}</div>`).join('')}</div>
     <div class="paper"><h2>숨은 결함 해설</h2>${R.flaws.map(f => `<div class="cm full"><div class="m">${esc(f.section)} · ${esc(f.card)}</div>${esc(f.note)}</div>`).join('')}</div></div>`;
 }
 
@@ -296,11 +303,11 @@ document.addEventListener('click', e => {
   const ph = t.closest('[data-ph]'); if (ph && teacher()) { go(Number(ph.dataset.ph)); return; }
   if (t.id === 'next') {
     if (phase() === 2) {
-      const left = Object.keys(D.progress).filter(g => !D.progress[g].rewrite);
-      if (left.length && !confirm2(t, left.join(', ') + '모둠 저장 전! 그래도 넘기기')) return;
+      const left = Object.keys(D.progress).filter(g => !D.progress[g].lines);
+      if (left.length && !confirm2(t, left.join(', ') + '모둠 고친 문장 0개! 그래도 넘기기')) return;
     }
     if (phase() === 3) {
-      const n = Object.keys(D.progress).length - 1, left = Object.keys(D.progress).filter(g => D.progress[g].reviews < n);
+      const left = Object.keys(D.progress).filter(g => D.progress[g].reviews < D.progress[g].toReview);
       if (left.length && !confirm2(t, left.join(', ') + '모둠 심사 덜 함! 그래도 넘기기')) return;
     }
     return go(Math.min(5, phase() + 1));

@@ -23,7 +23,7 @@
  */
 
 const SH = { PHRASE: '표현카드', TEXT: '본문', CONF: '설정', FLAW: '결함', DATA: '자료', CLUE: '단서', ZONE: '복원구역', LOG: '기록' };
-const LOG_HEAD = ['id', '시각', '종류', '모둠', '역할', '문장번호', '고른 문장', '결함 카드', '문제점', '이렇게 바꾸자', '판정', '대상', '숨김', '반'];
+const LOG_HEAD = ['id', '시각', '종류', '모둠', '역할', '문장번호', '고른 문장', '결함 카드', '문제점', '이렇게 바꾸자', '판정', '대상', '숨김', '반', '이름'];
 const PHASES = ['브리핑', '1라운드 결함 수사', '2라운드 보고서 복원', '3라운드 상호 심사', '4라운드 내 초안 수사', '결과 공개'];
 const CARDS = [
   ['찬반형 질문', '탐구 질문이 예/아니오로 끝난다'],
@@ -79,7 +79,7 @@ function setupGame() {
     ['A1', '탐구 질문', '0-0', '찬반형 질문', '윤리·공정', '자료 5', '"설치되어야 하는가?"는 예/아니오로 끝난다. 어떤 기준과 조건으로 운영해야 하는지 묻는 질문으로 바꾼다.'],
     ['A2', '서론', '1-1,1-2', '한쪽 수치만 있음', '팩트체크', '자료 1-5', '경제 효과 수치만 있고 생태 피해 쪽 수치가 없다. 산양 흔적 같은 반대쪽 수치를 함께 놓는다.'],
     ['B-b', '서론', '1-1', '위치 없는 출처', '팩트체크', '자료 1-2', '"(자료 1)"만 있고 몇 번째 문단인지 없다. "자료 1 · 2번째 문단"처럼 위치까지 쓴다.'],
-    ['B-c', '서론·본론', '1-3,3-2,4-3', '사실만 반복하는 해석', '팩트체크', '', '해석 문장이 자료 내용을 다시 말할 뿐이다. 수치가 무엇을 뜻하는지, 전문가에게 왜 중요한지를 쓴다.'],
+    ['B-c', '서론·본론', '1-3,3-2,4-3', '사실만 반복하는 해석', '현실·실행', '', '해석 문장이 자료 내용을 다시 말할 뿐이다. 수치가 무엇을 뜻하는지, 전문가에게 왜 중요한지를 쓴다.'],
     ['B-a', '본론 1', '2-3', '믿을 수 없는 자료', '팩트체크', '자료 6', '"어떤 여행 블로그"는 인정 자료가 아니다. 위치가 분명한 조사 자료로 바꾼다.'],
     ['C1', '본론 1', '2-0,2-2,2-4', '전문가 관점 없음', '환경·미래', '자료 2', '환경공학자인데 근거가 접근성뿐이다. 생태 보전 기준 같은 환경공학자의 판단을 넣는다.'],
     ['C2', '본론 2', '3-0,3-1,3-3', '한계 회피', '윤리·공정', '자료 5', '본론1 주장의 한계가 아니라 공사 소음을 다룬다. 정상 탐방 제한, 아고산대 회복 같은 진짜 한계를 인정한다.'],
@@ -140,8 +140,9 @@ function setupGame() {
     ['공통', '핵심 단어', '과태료'], ['공통', '핵심 단어', '조건부 운영'], ['공통', '핵심 단어', '생태 보전 기준'], ['공통', '핵심 단어', '정상 탐방로 제한']
   ], [80, 90, 560]);
 
-  const lg = make(SH.LOG, [LOG_HEAD], [70, 130, 60, 50, 80, 90, 220, 110, 220, 220, 70, 60, 50, 60]);
+  const lg = make(SH.LOG, [LOG_HEAD], [70, 130, 60, 50, 80, 90, 220, 110, 220, 220, 70, 60, 50, 60, 90]);
   if (String(lg.getRange(1, 14).getValue()) !== '반') lg.getRange(1, 14).setValue('반').setFontWeight('bold');   // 예전 기록 탭에 '반' 칸 추가
+  if (String(lg.getRange(1, 15).getValue()) !== '이름') lg.getRange(1, 15).setValue('이름').setFontWeight('bold');
   const cf = sheet_(SH.CONF);
   if (!cf.getDataRange().getValues().some(r => String(r[0]).trim() === '반 목록 (쉼표로 구분)')) cf.appendRow(['반 목록 (쉼표로 구분)', '2-1반,2-2반,2-3반,2-4반,2-5반,2-6반']);
   bustAll_();
@@ -179,7 +180,7 @@ function doPost(e) {
     const req = JSON.parse(e.postData.contents || '{}');
     const api = {
       boot: boot, state: studentState, submitFind: submitFind, useHint: useHint,
-      saveRewrite: saveRewrite, submitReview: submitReview, submitSelf: submitSelf,
+      saveLine: saveLine, submitRline: submitRline, submitReviewAll: submitReviewAll, submitSelf: submitSelf,
       board: boardState, setPhase: setPhase, toggleHide: toggleHide, checkPin: checkPin,
       admin: admin, openClass: openClass, addClass: addClass, resetClass: resetClass, setHidden: setHidden
     };
@@ -277,7 +278,7 @@ function logAll_() {
   const list = rows_(SH.LOG).filter(r => r[0] && String(r[12]).trim() === '').map(r => ({
     id: String(r[0]), time: r[1] instanceof Date ? r[1].getTime() : 0, type: String(r[2]), group: Number(r[3]), role: String(r[4]),
     keys: keyStr_(r[5]).split(',').filter(Boolean), quote: String(r[6]), card: String(r[7]), problem: String(r[8]), fix: String(r[9]),
-    result: String(r[10]), target: String(r[11]), cls: keyStr_(r[13] == null ? '' : r[13]).trim()
+    result: String(r[10]), target: String(r[11]), cls: keyStr_(r[13] == null ? '' : r[13]).trim(), who: String(r[14] == null ? '' : r[14])
   }));
   try { cache.put('log', JSON.stringify(list), 3); } catch (e) {}
   return list;
@@ -285,13 +286,13 @@ function logAll_() {
 function bust_() { CacheService.getScriptCache().remove('log'); }
 function bustAll_() { CacheService.getScriptCache().removeAll(['log', 'conf', 'secs', 'flaws', 'data', 'clues', 'zones', 'phrases']); }
 
-function append_(row) {
+function append_(row, who) {
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
     const id = Utilities.getUuid().slice(0, 8);
     const log = sheet_(SH.LOG);
-    log.appendRow([id, new Date()].concat(row.slice(0, 11), [curCls_()]).map(v => typeof v === 'string' && /^\d+-\d+$/.test(v) ? "'" + v : v));
+    log.appendRow([id, new Date()].concat(row.slice(0, 11), [curCls_(), clean_(who, 60)]).map(v => typeof v === 'string' && /^\d+-\d+$/.test(v) ? "'" + v : v));
     bust_();
     return id;
   } finally { lock.releaseLock(); }
@@ -330,12 +331,10 @@ function score_(log, flaws, conf) {
     if (e.type === 'hint') G.hint += conf.hintCost;
   });
 
-  // 상호 심사: 모둠별·대상별 마지막 심사만 반영
-  const lastReview = {};
-  log.filter(e => e.type === 'review').forEach(e => { lastReview[e.group + '>' + e.target] = e; });
-  Object.values(lastReview).forEach(e => {
+  // 상호 심사: 심사 모둠·대상 문장별 마지막 판정만, '타당해요' 1개당 +1
+  Object.values(lastRline_(log)).forEach(e => {
     const T = groups[Number(e.target)]; if (!T || Number(e.target) === e.group) return;
-    T.review += String(e.card).split(',').filter(Boolean).length;   // 체크 수
+    if (e.card === 'ok') T.review += 1;
   });
 
   Object.values(groups).forEach(G => {
@@ -357,7 +356,7 @@ function boot() {
     title: conf.title, groups: conf.groups, roles: conf.roles, phases: PHASES,
     cards: CARDS.map(c => ({ name: c[0], desc: c[1] })),
     sections: sections_().map(s => ({ name: s.name, sentences: s.sentences })),
-    clues: clues_(), zones: zones_(), flawCount: flaws_().length, hintCost: conf.hintCost, reviewChecks: REVIEW_CHECKS, phrases: phrases_(),
+    clues: clues_(), flawCount: flaws_().length, hintCost: conf.hintCost, phrases: phrases_(),
     state: getState_()
   };
 }
@@ -385,33 +384,24 @@ function studentState(group) {
   Object.values(found).forEach(f => { if (f.kind === 'full' && f.evidence) opened[f.evidence] = true; });
   const allOpen = st.phase >= 1;   // 자료 상자는 1라운드부터 모두 공개 (결함 판단에 필요)
   const hints = mine.filter(e => e.type === 'hint').map(e => ({ text: e.problem }));
-  const rewrites = {};
-  log.filter(e => e.type === 'rewrite').forEach(e => { rewrites[e.group] = rewrites[e.group] || {}; rewrites[e.group][e.target] = { text: e.fix, role: e.role, time: e.time }; });
-  const reviews = {};
-  mine.filter(e => e.type === 'review').forEach(e => reviews[e.target] = { checks: String(e.card).split(',').filter(Boolean), comment: e.problem });
+  const target = reviewTarget_(group, conf.groups);
+  const myLines = st.phase >= 2 ? lines_(log, group) : {};
+  const myR = {}; Object.values(lastRline_(log)).filter(e => e.group === group).forEach(e => myR[e.keys[0]] = { verdict: e.card, comment: e.problem, who: e.who });
+  const gotR = {}; Object.values(lastRline_(log)).filter(e => Number(e.target) === group).forEach(e => (gotR[e.keys[0]] = gotR[e.keys[0]] || []).push({ verdict: e.card, comment: e.problem }));
+  const allC = mine.filter(e => e.type === 'review').pop();
   return {
     state: st,
     finds: mine.filter(e => e.type === 'find').map(e => ({ id: e.id, role: e.role, keys: e.keys, quote: e.quote, card: e.card, problem: e.problem, fix: e.fix, result: e.result.split(':')[0] || 'none' })).reverse(),
     found: Object.values(found).map(f => ({ code: f.code, section: f.section, keys: f.hitKeys, kind: f.kind, card: f.card, evidence: f.evidence, note: f.note, locked: f.kind !== 'full' && f.tries >= 2 })),
     data: data.map(d => (allOpen || opened[d.id]) ? d : { id: d.id, name: d.name, loc: d.loc, locked: true }),
     hints: hints,
-    rewrites: st.phase >= 3 ? rewrites : { [group]: rewrites[group] || {} },
-    reviews: reviews,
+    lines: myLines,
+    review: st.phase >= 3 ? { target, changes: changes_(lines_(log, target)), mine: myR, comment: allC ? allC.problem : '', got: gotR } : null,
     selfs: mine.filter(e => e.type === 'self').map(e => ({ role: e.role, card: e.card, problem: e.problem, fix: e.fix })),
-    zoneFlaws: st.phase >= 2 ? zoneFlaws_(group, flaws, found) : [],
+    allFlaws: st.phase >= 2 ? flaws.map(f => ({ code: f.code, card: f.card, note: f.note, evidence: f.evidence, keys: f.keys, role: f.role, found: !!(found[f.code] && found[f.code].kind === 'full') })) : [],
     foundCards: st.phase >= 4 ? classCards_(log, flaws) : [],
     result: st.phase >= 5 && st.reveal ? resultPack_(log, flaws, conf) : null
   };
-}
-
-function zoneFlaws_(group, flaws, found) {
-  const zone = zones_()[group] || [];
-  const secs = sections_().map(s => s.name);
-  return flaws.filter(f => f.keys.some(k => zone.indexOf(secs[Number(k.split('-')[0])]) >= 0)).map(f => ({
-    code: f.code, card: f.card, note: f.note, evidence: f.evidence,
-    sections: [...new Set(f.keys.map(k => secs[Number(k.split('-')[0])]).filter(n => zone.indexOf(n) >= 0))],
-    found: !!(found[f.code] && found[f.code].kind === 'full')
-  }));
 }
 
 function classCards_(log, flaws) {
@@ -457,7 +447,7 @@ function submitFind(p) {
   } else { msg = 'none'; }
 
   const quote = keys.map(k => sentenceOf_(k)).join(' ');
-  append_(['find', g, p.role, keys.join(','), quote.slice(0, 1000), p.card, problem, fix, result, '', '']);
+  append_(['find', g, p.role, keys.join(','), quote.slice(0, 1000), p.card, problem, fix, result, '', ''], p.who);
   const out = { msg };
   if (msg === 'full') {
     const f = flaws.find(x => 'full:' + x.code === result);
@@ -485,40 +475,99 @@ function useHint(p) {
   // 역할 담당 결함을 먼저
   const pick = left.find(f => f.role === p.role) || left[0];
   const text = `${pick.section}에 「${pick.card}」 결함이 숨어 있다.`;
-  append_(['hint', g, p.role, '', '', '', text, '', pick.code, '', '']);
+  append_(['hint', g, p.role, '', '', '', text, '', pick.code, '', ''], p.who);
   return { text };
 }
 
-function saveRewrite(p) {
+/* ---------- 2라운드: 문장 단위 고쳐 쓰기 ---------- */
+function lines_(log, group) {
+  const m = {};
+  log.filter(e => e.type === 'line' && e.group === group).forEach(e => {
+    let meta = {}; try { meta = JSON.parse(e.quote || '{}'); } catch (x) {}
+    const k = e.keys[0] || '';
+    m[k] = { key: k, sec: e.target, text: e.fix, reason: e.problem, del: e.card === 'del', who: e.who, role: e.role, time: e.time, after: meta.after || '' };
+  });
+  return m;
+}
+function assemble_(si, sentences, lines) {
+  const out = [];
+  const adds = Object.values(lines).filter(l => l.key.indexOf('n:') === 0 && !l.del && l.text.trim());
+  sentences.forEach((orig, j) => {
+    const k = si + '-' + j, L = lines[k];
+    if (!(L && L.del)) out.push(L ? L.text : orig);
+    adds.filter(a => a.after === k).sort((a, b) => a.time - b.time).forEach(a => out.push(a.text));
+  });
+  return out.join(' ');
+}
+function changes_(lines) {
+  const secs = sections_();
+  return Object.values(lines).filter(l => {
+    if (l.key.indexOf('n:') === 0) return !l.del && l.text.trim();
+    return l.del || l.text !== sentenceOf_(l.key);
+  }).map(l => ({ key: l.key, sec: l.sec, orig: l.key.indexOf('n:') === 0 ? '' : sentenceOf_(l.key), text: l.text, reason: l.reason, del: l.del, who: l.who, role: l.role, added: l.key.indexOf('n:') === 0, after: l.after }))
+    .sort((a, b) => order_(a) - order_(b));
+}
+function order_(c) {
+  const k = c.added ? c.after : c.key;
+  const [a, b] = String(k).split('-').map(Number); return a * 1000 + b * 10 + (c.added ? 5 : 0);
+}
+function groupEssay_(log, group) {
+  const L = lines_(log, group);
+  return sections_().map((s, si) => ({ name: s.name, text: assemble_(si, s.sentences, L) }));
+}
+function reviewTarget_(g, n) { return g % n + 1; }   // 1→2, 2→3, …, 마지막→1
+function lastRline_(log) {
+  const m = {};
+  log.filter(e => e.type === 'rline').forEach(e => { m[e.group + '>' + e.target + '>' + (e.keys[0] || '')] = e; });
+  return m;
+}
+
+function saveLine(p) {
   needClass_();
   const st = getState_(); need_(st.phase === 2, '지금은 보고서 복원 시간이 아니에요.');
   const conf = conf_(); const g = Number(p.group); checkGroupRole_(g, p.role, conf);
-  const zone = zones_()[g] || [];
-  const names = sections_().map(s => s.name);
-  const saved = [];
-  (p.parts || []).forEach(part => {
-    const sec = String(part.section);
-    need_(zone.indexOf(sec) >= 0 && names.indexOf(sec) >= 0, '우리 모둠이 맡은 구간이 아니에요.');
-    const text = clean_(part.text, 2000);
-    need_(text.replace(/\s/g, '').length >= 10, `「${sec}」 고친 글이 너무 짧아요.`);
-    append_(['rewrite', g, p.role, '', '', '', '', text, '', sec, '']);
-    saved.push(sec);
-  });
-  need_(saved.length, '저장할 글이 없어요.');
-  return { saved };
+  const secs = sections_();
+  const key = String(p.key || '');
+  let sec = '', after = '';
+  if (/^\d+-\d+$/.test(key)) {
+    const [a, b] = key.split('-').map(Number);
+    need_(secs[a] && secs[a].sentences[b] != null, '없는 문장이에요.');
+    sec = secs[a].name;
+  } else {
+    need_(/^n:[a-z0-9]{4,12}$/.test(key), '문장 번호가 이상해요.');
+    after = String(p.after || '');
+    need_(/^\d+-\d+$/.test(after) && secs[Number(after.split('-')[0])], '어디 뒤에 넣을지 알 수 없어요.');
+    sec = secs[Number(after.split('-')[0])].name;
+  }
+  const text = clean_(p.text, 800), reason = clean_(p.reason, 300), del = !!p.del;
+  const isOrig = /^\d+-\d+$/.test(key) && text === sentenceOf_(key) && !del;
+  if (!isOrig && !(del && key.indexOf('n:') === 0)) need_(reason.replace(/\s/g, '').length >= 4, '왜 이렇게 바꿨는지 짧게라도 적어 주세요. (상호 심사 때 다른 모둠이 봐요)');
+  if (!del && !isOrig) need_(text.replace(/\s/g, '').length >= 4, '고친 문장이 너무 짧아요.');
+  append_(['line', g, p.role, key, JSON.stringify({ after }), del ? 'del' : '', reason, text, '', sec, ''], p.who);
+  return { ok: true };
 }
 
-const REVIEW_CHECKS = ['출처를 위치까지 밝혔다', '해석에 의미와 전문가 관점이 있다', '원래 결함이 고쳐졌다'];
-function submitReview(p) {
+/* ---------- 3라운드: 문장별 타당성 심사 ---------- */
+function submitRline(p) {
   needClass_();
   const st = getState_(); need_(st.phase === 3, '지금은 상호 심사 시간이 아니에요.');
   const conf = conf_(); const g = Number(p.group); checkGroupRole_(g, p.role, conf);
-  const t = Number(p.target);
-  need_(t >= 1 && t <= conf.groups && t !== g, '다른 모둠의 글만 심사할 수 있어요.');
-  const checks = (p.checks || []).map(Number).filter(i => i >= 0 && i < REVIEW_CHECKS.length);
+  const t = reviewTarget_(g, conf.groups);
+  need_(p.verdict === 'ok' || p.verdict === 'no', '타당해요 / 아쉬워요 중에 골라 주세요.');
+  const comment = clean_(p.comment, 300);
+  if (p.verdict === 'no') need_(comment.replace(/\s/g, '').length >= 4, '아쉬운 점을 짧게 적어 주세요.');
+  const key = String(p.key || '');
+  need_(changes_(lines_(log_(), t)).some(c => c.key === key), '심사할 수 없는 문장이에요.');
+  append_(['rline', g, p.role, key, '', p.verdict, comment, '', '', String(t), ''], p.who);
+  return { ok: true };
+}
+function submitReviewAll(p) {
+  needClass_();
+  const st = getState_(); need_(st.phase === 3, '지금은 상호 심사 시간이 아니에요.');
+  const conf = conf_(); const g = Number(p.group); checkGroupRole_(g, p.role, conf);
   const comment = clean_(p.comment, 300);
   need_(comment.replace(/\s/g, '').length >= 5, '한 줄 평을 적어 주세요.');
-  append_(['review', g, p.role, '', '', [...new Set(checks)].join(','), comment, '', '', String(t), '']);
+  append_(['review', g, p.role, '', '', '', comment, '', '', String(reviewTarget_(g, conf.groups)), ''], p.who);
   return { ok: true };
 }
 
@@ -530,7 +579,7 @@ function submitSelf(p) {
   const where = clean_(p.where, 300), plan = clean_(p.plan, 400);
   need_(where.replace(/\s/g, '').length >= 4, '내 초안의 어느 부분인지 적어 주세요.');
   need_(plan.replace(/\s/g, '').length >= 8, '어떻게 고칠지 조금 더 자세히 적어 주세요.');
-  append_(['self', g, p.role, '', '', p.card, where, plan, '', '', '']);
+  append_(['self', g, p.role, '', '', p.card, where, plan, '', '', ''], p.who);
   return { ok: true };
 }
 
@@ -642,37 +691,50 @@ function boardState(pin) {
   const progress = {};
   for (let g = 1; g <= conf.groups; g++) progress[g] = {
     finds: log.filter(e => e.group === g && e.type === 'find').length,
-    rewrite: log.some(e => e.group === g && e.type === 'rewrite'),
-    reviews: new Set(log.filter(e => e.group === g && e.type === 'review').map(e => e.target)).size,
+    lines: changes_(lines_(log, g)).length,
+    reviews: Object.values(lastRline_(log)).filter(e => e.group === g).length,
+    toReview: changes_(lines_(log, reviewTarget_(g, conf.groups))).length,
     selfs: log.filter(e => e.group === g && e.type === 'self').length
   };
-  const rewrites = {};
-  log.filter(e => e.type === 'rewrite').forEach(e => { rewrites[e.group] = rewrites[e.group] || {}; rewrites[e.group][e.target] = { text: e.fix, time: e.time }; });
-  const reviews = log.filter(e => e.type === 'review').map(e => ({ group: e.group, target: Number(e.target), checks: String(e.card).split(',').filter(Boolean).map(Number), comment: e.problem }));
+  const essays = {}, changes = {};
+  for (let g = 1; g <= conf.groups; g++) { essays[g] = groupEssay_(log, g); changes[g] = changes_(lines_(log, g)); }
+  const rlines = Object.values(lastRline_(log)).map(e => ({ group: e.group, target: Number(e.target), key: e.keys[0], verdict: e.card, comment: e.problem }));
+  const reviews = log.filter(e => e.type === 'review').map(e => ({ group: e.group, target: Number(e.target), comment: e.problem }));
   const selfs = log.filter(e => e.type === 'self').map(e => ({ group: e.group, role: e.role, card: e.card, where: e.problem, plan: e.fix }));
   return {
-    teacher, state: st, reviewChecks: REVIEW_CHECKS,
+    teacher, state: st,
     finds: log.filter(e => e.type === 'find').map(e => ({ id: e.id, group: e.group, role: e.role, keys: e.keys, card: e.card, problem: e.problem, fix: e.fix, hit: e.result.split(':')[0] || 'none' })),
-    flawMap, progress, rewrites, reviews, selfs,
+    flawMap, progress, essays, changes, rlines, reviews, selfs,
     result: st.phase >= 5 && st.reveal ? resultPack_(log, flaws, conf) : null
   };
 }
 
 function resultPack_(log, flaws, conf) {
   const groups = score_(log, flaws, conf);
-  const max = flaws.length * 4 + (conf.groups - 1) * REVIEW_CHECKS.length;
+  const flawKeys = new Set(); flaws.forEach(f => f.keys.forEach(k => flawKeys.add(k)));
+  const max = flaws.length * 4 + flawKeys.size;
   const rank = Object.values(groups).sort((a, b) => b.total - a.total).map(G => ({
     group: G.group, total: G.total, find: G.find, bonus: G.bonus, review: G.review, hint: G.hint,
     flawsFound: Object.values(G.flaws).filter(f => f.pts === 3).length, grade: grade_(G.total, max)
   }));
-  // 복원된 보고서: 원문 구간을 맡은 모둠의 마지막 저장본으로 바꿈
-  const zones = zones_();
-  const last = {};
-  log.filter(e => e.type === 'rewrite').forEach(e => last[e.group + '|' + e.target] = e.fix);
-  const restored = sections_().map(s => {
-    let by = 0, text = '';
-    Object.keys(zones).forEach(g => { if (zones[g].indexOf(s.name) >= 0 && last[g + '|' + s.name]) { by = Number(g); text = last[g + '|' + s.name]; } });
-    return { name: s.name, original: s.text, text: text || s.text, by };
+  // 복원된 보고서: 구간마다 '타당해요'를 가장 많이 받은 모둠의 글 (같으면 더 많이 고친 모둠)
+  const secs = sections_();
+  const okBy = {};
+  Object.values(lastRline_(log)).forEach(e => {
+    if (e.card !== 'ok') return;
+    const t = Number(e.target), c = changes_(lines_(log, t)).find(x => x.key === e.keys[0]);
+    if (c) okBy[t + '|' + c.sec] = (okBy[t + '|' + c.sec] || 0) + 1;
+  });
+  const restored = secs.map((s, si) => {
+    let best = 0, bestScore = -1, bestText = s.text;
+    for (let g = 1; g <= conf.groups; g++) {
+      const L = lines_(log, g);
+      const nChg = changes_(L).filter(c => c.sec === s.name).length;
+      if (!nChg) continue;
+      const sc = (okBy[g + '|' + s.name] || 0) * 100 + nChg;
+      if (sc > bestScore) { bestScore = sc; best = g; bestText = assemble_(si, s.sentences, L); }
+    }
+    return { name: s.name, original: s.text, text: bestText, by: best, ok: best ? (okBy[best + '|' + s.name] || 0) : 0 };
   });
   return { rank, max, restored, flaws: flaws.map(f => ({ code: f.code, section: f.section, card: f.card, note: f.note })) };
 }
