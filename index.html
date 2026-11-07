@@ -30,6 +30,7 @@ button{font-family:inherit;color:inherit}
 .steps span.on{background:var(--gold);color:#fff;font-weight:700}
 .steps span.done{color:#c9d6d1}
 main{max-width:920px;margin:0 auto;padding:14px 14px 240px}
+body.tool main{padding-bottom:calc(30vh + 160px)}
 .paper{background:var(--paper);border-radius:12px;padding:16px 18px;margin-bottom:12px;box-shadow:0 2px 0 rgba(0,0,0,.18)}
 .paper h2{font-family:var(--display);font-size:21px;margin:0 0 8px}
 .paper h3{font-size:15px;margin:14px 0 6px}
@@ -129,7 +130,7 @@ textarea{resize:vertical;min-height:58px}
 <div class="sheet" id="sheet"><div class="inner" id="sheetInner"></div></div>
 <div class="verdict" id="verdict"><div class="vbox" id="vbox"></div></div>
 
-<script src="common.js?v=1"></script>
+<script src="common.js?v=2"></script>
 <script>
 let B = null;              // boot: 글, 카드, 단서, 구역
 let S = null;              // 우리 모둠 상태
@@ -184,7 +185,7 @@ function renderFind() {
   let body = '';
   if (tab === 'report') {
     const fk = foundByKey();
-    body = `<div class="paper"><p class="muted" style="margin-top:0">결함이 있다고 생각하는 문장을 누르세요. 여러 문장을 함께 고를 수 있어요.</p>` +
+    body = `<div class="paper"><p class="muted" style="margin-top:0">결함이 있다고 생각하는 문장을 누르고, 어떤 결함인지 카드로 고르세요. 이번 라운드는 <b>찾기만</b> 합니다. 고쳐 쓰기는 2라운드에서 해요.</p>` +
       B.sections.map((sec, si) => `<div class="sec"><div class="nm">${esc(sec.name)}</div><div class="txt">` +
         sec.sentences.map((s, j) => {
           const k = si + '-' + j, fs = fk[k] || [];
@@ -201,7 +202,7 @@ function renderFind() {
       (S.hints.length ? `<h3>사용한 힌트</h3>${S.hints.map(h => `<div class="rec">💡 ${esc(h.text)}</div>`).join('')}` : '') +
       `<h3>제출한 의견 ${S.finds.length}개</h3>` +
       (S.finds.map(f => `<div class="rec ${f.result}"><div class="m">${esc(f.role)} · ${esc(f.card)} · ${f.result === 'full' ? '결함 발견' : f.result === 'part' ? '문장만 맞음' : '기록됨'}</div>
-        <div class="m">“${esc(f.quote.length > 70 ? f.quote.slice(0, 70) + '…' : f.quote)}”</div><div><b>문제</b> ${esc(f.problem)}</div><div><b>바꾸자</b> ${esc(f.fix)}</div></div>`).join('') || '<p class="muted">아직 없어요.</p>') + `</div>`;
+        <div class="m">“${esc(f.quote.length > 70 ? f.quote.slice(0, 70) + '…' : f.quote)}”</div>${f.problem ? `<div><b>이유</b> ${esc(f.problem)}</div>` : ''}</div>`).join('') || '<p class="muted">아직 없어요.</p>') + `</div>`;
   }
   $('main').innerHTML = `<div class="counter"><span>우리 모둠 확보 결함</span><span class="n">${full} / ${B.flawCount}</span><span>· 증거물 ${ev} / ${S.data.length}</span>
       <button class="hintbtn" id="hint">💡 힌트 (−${B.hintCost})</button></div>
@@ -215,13 +216,12 @@ function renderFindSheet() {
   if ($('sheetInner').dataset.mode === 'find' && editing) {           // 입력 중이면 인용만 갱신
     $('quote').innerHTML = quoteHTML(); return;
   }
-  const keepP = $('problem')?.value || '', keepF = $('fix')?.value || '';
+  const keepP = $('problem')?.value || '';
   $('sheetInner').dataset.mode = 'find';
   $('sheetInner').innerHTML = `<div class="quote" id="quote">${quoteHTML()}</div>
     <label>결함 이름 고르기</label><div class="cards">${B.cards.map(c => `<button class="card ${card === c.name ? 'on' : ''}" data-card="${esc(c.name)}">${esc(c.name)}</button>`).join('')}</div>
     <div class="carddesc" id="carddesc">${esc(B.cards.find(c => c.name === card)?.desc || '카드를 누르면 뜻이 보여요.')}</div>
-    <label for="problem">무엇이 문제인가? (${esc(me.role)}의 눈으로)</label><textarea id="problem" maxlength="500" placeholder="예) 70%가 어디서 나온 수치인지 믿을 수 없다.">${esc(keepP)}</textarea>
-    <label for="fix">이렇게 바꾸자</label><textarea id="fix" maxlength="500" placeholder="예) 자료 6 · 2번째 문단의 고령층 설문으로 바꾼다.">${esc(keepF)}</textarea>
+    <label for="problem">왜 문제일까? <span style="font-weight:400;color:var(--ink-soft)">(한 줄, 안 써도 됨 · 고치는 건 2라운드에서)</span></label><input type="text" id="problem" maxlength="300" placeholder="예) 블로그 수치라서 믿기 어렵다" value="${esc(keepP)}">
     <div class="btns"><button class="btn ghost" id="cancel">선택 취소</button><button class="btn red" id="submitFind">수사 결과 제출</button></div><div class="msg" id="msg"></div>`;
 }
 function quoteHTML() { return sortKeys([...picked]).map(k => `<b>[${esc(secName(k))}]</b> ${esc(sentence(k))}`).join('<br>'); }
@@ -249,20 +249,63 @@ function myZone() { return B.zones[me.group] || B.zones[String(me.group)] || [];
 function renderRewrite() {
   const zone = myZone();
   const saved = (S.rewrites[me.group] || {});
-  const secs = B.sections.filter(s => zone.indexOf(s.name) >= 0);
+  const secs = B.sections.filter(sec => zone.indexOf(sec.name) >= 0);
   $('main').innerHTML = `<div class="paper"><h2>보고서 복원 · ${me.group}모둠 담당: ${esc(zone.join(', '))}</h2>
-      <p class="muted">원문을 지우고 다시 써도 되고, 고칠 부분만 바꿔도 됩니다. 증거물(자료)을 쓸 때는 "자료 번호 · 몇 번째 문단"을 꼭 적으세요. 한 사람이 대표로 저장하면 모둠 전체에 반영됩니다.</p></div>` +
-    secs.map(s => {
-      const sv = saved[s.name];
-      const val = draft[s.name] != null ? draft[s.name] : (sv ? sv.text : s.sentences.join(' '));
-      return `<div class="paper"><h3 style="margin-top:0">${esc(s.name)} ${sv ? `<span class="ok">· 저장됨 (${esc(sv.role)})</span>` : ''}</h3>
-        <div class="orig">${esc(s.sentences.join(' '))}</div>
-        <label>고쳐 쓴 글</label><textarea data-rw="${esc(s.name)}" style="min-height:180px">${esc(val)}</textarea>
-        ${sv && draft[s.name] != null && draft[s.name] !== sv.text ? `<button class="btn ghost" data-load="${esc(s.name)}" style="margin-top:6px">모둠이 저장한 글 불러오기</button>` : ''}</div>`;
+      <p class="muted">① 아래 '고쳐야 할 결함'을 확인하고 ② 글 칸을 누른 뒤 ③ 화면 아래 <b>카드 상자</b>에서 자료 카드·표현 카드를 눌러 넣으세요. 카드의 ( ) 칸은 내 말로 채웁니다. 한 사람이 대표로 저장하면 모둠 전체에 반영돼요.</p></div>` +
+    secs.map(sec => {
+      const sv = saved[sec.name];
+      const val = draft[sec.name] != null ? draft[sec.name] : (sv ? sv.text : sec.sentences.join(' '));
+      const fl = (S.zoneFlaws || []).filter(f => f.sections.indexOf(sec.name) >= 0);
+      return `<div class="paper"><h3 style="margin-top:0">${esc(sec.name)} ${sv ? `<span class="ok">· 저장됨 (${esc(sv.role)})</span>` : ''}</h3>
+        <div class="orig">${esc(sec.sentences.join(' '))}</div>
+        <h3>고쳐야 할 결함 ${fl.length}개</h3>${fl.map(f => `<div class="rec ${f.found ? 'full' : 'part'}"><div class="m">${f.found ? '✔ 우리 모둠이 찾음' : '못 찾았지만 이제 공개'} · <b>${esc(f.card)}</b>${f.evidence ? ` · 추천 증거물 ${esc(f.evidence)}` : ''}</div>${esc(f.note)}</div>`).join('') || '<p class="muted">없음</p>'}
+        <label>고쳐 쓴 글</label><textarea data-rw="${esc(sec.name)}" style="min-height:200px">${esc(val)}</textarea>
+        <div class="btns" style="margin-top:6px"><button class="btn ghost" data-clear="${esc(sec.name)}">글 칸 비우기</button>${sv && draft[sec.name] != null && draft[sec.name] !== sv.text ? `<button class="btn ghost" data-load="${esc(sec.name)}">모둠이 저장한 글 불러오기</button>` : ''}</div></div>`;
     }).join('') +
-    `<div class="paper"><div class="btns" style="margin-top:0"><button class="btn red" id="saveRw">모둠 글 저장</button></div><div class="msg" id="msg"></div></div>
-     <div class="paper"><h2>증거물 보관함</h2>${S.data.map(d => `<div class="ev"><div class="h">${esc(d.name)} · ${esc(d.loc)}</div><div class="b">${esc(d.text)}</div></div>`).join('')}</div>
-     <div class="paper"><h2>우리 모둠이 찾은 결함</h2>${S.found.filter(f => f.kind === 'full').map(f => `<div class="rec full"><b>${esc(f.section)}</b> · ${esc(f.card)}</div>`).join('') || '<p class="muted">없음</p>'}</div>`;
+    `<div class="paper"><div class="btns" style="margin-top:0"><button class="btn red" id="saveRw">모둠 글 저장</button></div><div class="msg" id="msg"></div></div>`;
+  renderToolbox();
+}
+
+/* 카드 상자 (화면 아래 고정) */
+let toolTab = 'data', toolOpen = true, lastTA = null;
+function renderToolbox() {
+  const show = phase() === 2;
+  $('sheet').classList.toggle('show', show);
+  document.body.classList.toggle('tool', show && toolOpen);
+  if (!show) return;
+  const zone = myZone();
+  const ph = (B.phrases || []).filter(p => p.kind !== '핵심 단어' && (p.section === '공통' || zone.indexOf(p.section) >= 0));
+  const words = (B.phrases || []).filter(p => p.kind === '핵심 단어');
+  let body = '';
+  if (toolTab === 'data') body = S.data.map(d => `<button class="card tcard" data-ins="${esc(d.name + ' · ' + d.loc + '에 따르면, ' + d.text + ' ')}" style="display:block;width:100%;margin-bottom:6px"><b style="color:var(--ok)">${esc(d.name)} · ${esc(d.loc)}</b><br>${esc(d.text)}</button>`).join('');
+  else if (toolTab === 'phrase') body = ph.map(p => `<button class="card tcard" data-ins="${esc(p.text + ' ')}" style="display:block;width:100%;margin-bottom:6px"><span style="font-size:12px;color:var(--gold);font-weight:700">${esc(p.section === '공통' ? '' : p.section + ' · ')}${esc(p.kind)}</span><br>${esc(p.text)}</button>`).join('');
+  else body = `<div class="cards">${words.map(p => `<button class="card tcard" data-ins="${esc(p.text)}">${esc(p.text)}</button>`).join('')}</div>`;
+  $('sheetInner').dataset.mode = 'tool';
+  $('sheetInner').innerHTML = `<div style="display:flex;gap:6px;align-items:center"><b style="font-family:var(--display)">카드 상자</b>
+      <button class="card ${toolTab === 'data' ? 'on' : ''}" data-tt="data">자료 카드</button><button class="card ${toolTab === 'phrase' ? 'on' : ''}" data-tt="phrase">표현 카드</button><button class="card ${toolTab === 'word' ? 'on' : ''}" data-tt="word">핵심 단어</button>
+      <button class="card" data-tt="fold" style="margin-left:auto">${toolOpen ? '접기 ▼' : '펼치기 ▲'}</button></div>
+    <div style="max-height:${toolOpen ? '30vh' : '0'};overflow:auto;margin-top:${toolOpen ? 8 : 0}px">${body}<p class="muted" style="margin:4px 0 0">카드를 누르면 마지막으로 누른 글 칸의 커서 자리에 들어가요. ( ) 칸이 바로 선택되니 그대로 입력하면 돼요.</p></div>`;
+}
+
+function insertCard(text, isWord) {
+  const ta = lastTA && lastTA.isConnected ? lastTA : document.querySelector('[data-rw]');
+  if (!ta) return;
+  let a = ta.selectionStart ?? ta.value.length, b = ta.selectionEnd ?? a;
+  if (!isWord && a === b) {
+    // 문장 카드는 쓰던 문장 중간이 아니라 그 문장 끝에 붙임
+    const v = ta.value, before = v.slice(0, a);
+    if (before.trim() && !/[.?!]\s*$/.test(before)) {
+      const m = v.slice(a).search(/[.?!]/);
+      a = b = m >= 0 ? a + m + 1 : v.length;
+    }
+    if (a > 0 && !/\s/.test(ta.value[a - 1])) text = ' ' + text;
+  }
+  ta.value = ta.value.slice(0, a) + text + ta.value.slice(b);
+  const blank = ta.value.indexOf('( ', a);
+  ta.focus();
+  if (blank >= 0 && blank < a + text.length) { const close = ta.value.indexOf(')', blank); ta.setSelectionRange(blank, close + 1); }
+  else ta.setSelectionRange(a + text.length, a + text.length);
+  draft[ta.dataset.rw] = ta.value; store('case_draft', draft);
 }
 
 /* ---------- 3 상호 심사 ---------- */
@@ -312,7 +355,8 @@ function render() {
   if (!me.group || !me.role || picking) { $('sheet').classList.remove('show'); return renderPick(); }
   if (!S) return;
   const p = phase();
-  if (p !== 1) $('sheet').classList.remove('show');
+  if (p !== 1 && p !== 2) $('sheet').classList.remove('show');
+  if (p !== 2) document.body.classList.remove('tool');
   if (tab === 'clue' && p === 1) { $('main').innerHTML = `<div class="tabs"><button data-tab="report">보고서</button><button data-tab="evidence">증거물</button><button data-tab="log">수사 기록</button><button data-tab="clue" class="on">내 단서</button></div><div class="paper"><h2>내 비밀 단서</h2>${clueHTML()}</div>`; return; }
   [renderBrief, renderFind, renderRewrite, renderReview, renderSelf, renderResult][p]();
 }
@@ -343,7 +387,7 @@ document.addEventListener('click', e => {
   if (t.id === 'register') { picking = false; store('case_me', me); S = null; lastSig = ''; render(); return poll(true); }
   if (t.id === 'change') { if (confirm2(t, '다시 누르면 모둠·역할을 바꿔요')) { picking = true; render(); } return; }
   const tb = t.closest('[data-tab]'); if (tb) { tab = tb.dataset.tab; render(); return; }
-  const s = t.closest('.s'); if (s && phase() === 1) { const k = s.dataset.k; picked.has(k) ? picked.delete(k) : picked.add(k); editing = !!($('problem')?.value || $('fix')?.value); render(); return; }
+  const s = t.closest('.s'); if (s && phase() === 1) { const k = s.dataset.k; picked.has(k) ? picked.delete(k) : picked.add(k); editing = !!($('problem')?.value); render(); return; }
   const cd = t.closest('[data-card]'); if (cd) {
     card = cd.dataset.card;
     document.querySelectorAll('[data-card]').forEach(b => b.classList.toggle('on', b.dataset.card === card));
@@ -365,12 +409,15 @@ document.addEventListener('click', e => {
     if (busy) return;
     if (!card) return setMsg('msg', '결함 이름 카드를 하나 골라 주세요.', true);
     busy = true; t.disabled = true; setMsg('msg', '판정 중...');
-    call('submitFind', { group: me.group, role: me.role, keys: sortKeys([...picked]), card, problem: $('problem').value, fix: $('fix').value })
+    call('submitFind', { group: me.group, role: me.role, keys: sortKeys([...picked]), card, problem: $('problem').value })
       .then(r => { picked.clear(); card = ''; editing = false; $('sheetInner').dataset.mode = ''; $('sheetInner').innerHTML = ''; showVerdict(r); return poll(true); })
       .catch(err => setMsg('msg', err, true))
       .finally(() => { busy = false; t.disabled = false; });
     return;
   }
+  const tt = t.closest('[data-tt]'); if (tt) { if (tt.dataset.tt === 'fold') toolOpen = !toolOpen; else { toolTab = tt.dataset.tt; toolOpen = true; } renderToolbox(); return; }
+  const ins = t.closest('[data-ins]'); if (ins) { insertCard(ins.dataset.ins, toolTab === 'word'); return; }
+  const cl = t.closest('[data-clear]'); if (cl) { if (!confirm2(cl, '한 번 더 누르면 비워져요')) return; const ta = document.querySelector(`[data-rw="${cl.dataset.clear}"]`); ta.value = ''; draft[cl.dataset.clear] = ''; store('case_draft', draft); lastTA = ta; ta.focus(); return; }
   const ld = t.closest('[data-load]'); if (ld) { delete draft[ld.dataset.load]; store('case_draft', draft); render(); return; }
   if (t.id === 'saveRw') {
     const parts = [...document.querySelectorAll('[data-rw]')].map(a => ({ section: a.dataset.rw, text: a.value }));
@@ -402,8 +449,11 @@ document.addEventListener('change', e => {
   const rv = e.target.closest('[data-rv]');
   if (rv) { const tg = Number(rv.dataset.rv); reviewSel[tg] = [...document.querySelectorAll(`[data-rv="${tg}"]`)].filter(x => x.checked).map(x => Number(x.dataset.i)); }
 });
+document.addEventListener('focusin', e => { if (e.target.dataset && e.target.dataset.rw) lastTA = e.target; });
+/* 카드를 눌러도 글 칸 커서가 사라지지 않게 */
+document.addEventListener('pointerdown', e => { if (e.target.closest('.tcard, [data-tt]')) e.preventDefault(); });
 document.addEventListener('input', e => {
-  if (e.target.id === 'problem' || e.target.id === 'fix') editing = true;
+  if (e.target.id === 'problem') editing = true;
   if (e.target.dataset && e.target.dataset.rw) { draft[e.target.dataset.rw] = e.target.value; store('case_draft', draft); }
 });
 

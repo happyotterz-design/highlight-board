@@ -98,7 +98,7 @@ header{display:flex;align-items:center;gap:14px;padding:10px 20px;color:#e8efec;
 <div class="login" id="login"><div class="box"><b>교사 비밀번호</b><input type="password" id="pin" inputmode="numeric" autocomplete="off"><div style="display:flex;gap:8px"><button class="tool red" id="pinOk" style="flex:1">확인</button><button class="tool" id="pinCancel">닫기</button></div><div id="pinMsg" style="color:var(--stamp);margin-top:8px"></div></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="common.js?v=1"></script>
+<script src="common.js?v=2"></script>
 <script>
 let B = null, D = null, pin = sessionGet('case_pin') || '', sel = null, gtab = 1, cardSel = '', revealDone = false;
 let fs = Number(store('case_fs')) || 22;
@@ -145,8 +145,8 @@ function vFind() {
   if (sel) {
     const arr = (byKey[sel] || []).slice().reverse();
     side = `<div class="paper"><div style="display:flex;align-items:center"><h2 style="margin:0">[${esc(secName(sel))}]</h2><button class="tool" data-k="${sel}" style="margin-left:auto;background:#fff;color:var(--ink)">닫기</button></div>
-      <div class="orig" style="margin:10px 0">${esc(sentence(sel))}</div><h3>이 문장에 대한 의견 ${arr.length}개</h3>` +
-      (arr.map(f => `<div class="cm"><div class="m">${f.group}모둠 · ${esc(f.role)}${teacher() ? `<button class="hide" data-hide="${esc(f.id)}">점수 무효</button>` : ''}</div><div><b>문제</b> ${esc(f.problem)}</div><div><b>바꾸자</b> ${esc(f.fix)}</div></div>`).join('') || '<p class="muted">아직 없어요.</p>') + `</div>`;
+      <div class="orig" style="margin:10px 0">${esc(sentence(sel))}</div><h3>이 문장을 짚은 기록 ${arr.length}개</h3>` +
+      (arr.map(f => `<div class="cm"><div class="m">${f.group}모둠 · ${esc(f.role)}${teacher() ? `<button class="hide" data-hide="${esc(f.id)}">점수 무효</button>` : ''}</div>${f.problem ? `<div>${esc(f.problem)}</div>` : '<div class="muted">(이유 없이 표시만 함)</div>'}</div>`).join('') || '<p class="muted">아직 없어요.</p>') + `</div>`;
   } else {
     side = `<div class="paper" style="text-align:center"><div class="muted" style="font-size:.7em">우리 반이 찾은 결함</div><div class="big">${found}<small> / ${D.flawMap.length}</small></div></div>
       <div class="paper"><h2>결함 목록</h2>${D.flawMap.map(f => `<div class="fl ${f.found ? 'on' : ''}"><span class="c">${f.found ? '발견' : '???'}</span><span>${esc(f.section)}</span><b style="margin-left:auto">${f.found ? (f.card ? esc(f.card) : '이름은 2라운드에 공개') : '· · ·'}</b>${f.found ? `<span class="muted">${f.groups}모둠</span>` : ''}</div>`).join('')}</div>

@@ -22,7 +22,7 @@
  *  기록  : 학생 제출이 쌓이는 곳 (숨김 칸에 아무 글자나 적으면 점수·화면에서 빠짐)
  */
 
-const SH = { TEXT: '본문', CONF: '설정', FLAW: '결함', DATA: '자료', CLUE: '단서', ZONE: '복원구역', LOG: '기록' };
+const SH = { PHRASE: '표현카드', TEXT: '본문', CONF: '설정', FLAW: '결함', DATA: '자료', CLUE: '단서', ZONE: '복원구역', LOG: '기록' };
 const LOG_HEAD = ['id', '시각', '종류', '모둠', '역할', '문장번호', '고른 문장', '결함 카드', '문제점', '이렇게 바꾸자', '판정', '대상', '숨김'];
 const PHASES = ['브리핑', '1라운드 결함 수사', '2라운드 보고서 복원', '3라운드 상호 심사', '4라운드 내 초안 수사', '결과 공개'];
 const CARDS = [
@@ -44,6 +44,7 @@ function setupGame() {
     let s = ss.getSheetByName(name);
     if (s && s.getLastRow() > 0) return s;
     s = s || ss.insertSheet(name);
+    s.getRange(1, 1, Math.max(rows.length, 300), rows[0].length).setNumberFormat('@');   // "1-1"이 날짜로 바뀌지 않게 글자 형식
     s.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
     s.getRange(1, 1, 1, rows[0].length).setFontWeight('bold');
     s.setFrozenRows(1);
@@ -111,6 +112,32 @@ function setupGame() {
     [3, '본론 2'],
     [4, '본론 3,결론']
   ], [60, 360]);
+
+  make(SH.PHRASE, [
+    ['구간', '종류', '카드'],
+    ['공통', '자료 인용', '( 자료 번호 ) · ( 몇 ) 번째 문단에 따르면, '],
+    ['공통', '해석', '이 수치는 ( )을/를 보여 준다.'],
+    ['공통', '해석', '환경공학자의 관점에서 이는 ( )라는 의미가 있다.'],
+    ['공통', '해석', '이 자료는 내 주장에서 ( )의 근거가 된다. 왜냐하면 ( ) 때문이다.'],
+    ['탐구 질문', '질문 틀', '환경공학자의 시선에서, 설악산 오색 케이블카는 ( )와/과 ( )을/를 함께 지키려면 어떤 기준으로 운영되어야 하는가?'],
+    ['탐구 질문', '질문 틀', '환경공학자의 시선에서, 설악산 오색 케이블카는 어떤 조건에서만 운영될 수 있는가?'],
+    ['서론', '연결', '반면, '],
+    ['서론', '딜레마', '이처럼 케이블카는 ( )와/과 ( ) 사이의 딜레마를 안고 있다.'],
+    ['서론', '주장', '따라서 나는 환경공학자로서 ( )이/가 지켜질 때에만 케이블카를 운영해야 한다고 주장한다.'],
+    ['본론 1', '근거', '케이블카가 필요한 이유는 ( )의 접근권 때문이다.'],
+    ['본론 1', '전문가 관점', '다만 환경공학자로서 ( )이/가 지켜진다는 조건이 먼저 필요하다.'],
+    ['본론 2', '한계 인정', '물론 내 주장에도 한계가 있다.'],
+    ['본론 2', '한계 내용', '( )에서는 ( )할 수 없다는 점이다.'],
+    ['본론 2', '재반박', '그럼에도 ( )(으)로 이 한계를 보완할 수 있다.'],
+    ['본론 3', '대안 틀', '첫째, ( )은/는 ( )을/를 의무로 해야 한다.'],
+    ['본론 3', '강제 장치', '이를 어기면 ( )을/를 부과한다.'],
+    ['본론 3', '재원', '이용 요금의 ( )%를 ( )에 쓰도록 정한다.'],
+    ['결론', '조건부 통찰', '( )(이)라는 조건이 지켜질 때에만 ( )와/과 ( )을/를 함께 이룰 수 있다.'],
+    ['결론', '가치관', '환경공학자로서 나는 ( )을/를 가장 중요하게 생각한다.'],
+    ['공통', '핵심 단어', '접근권'], ['공통', '핵심 단어', '고령층'], ['공통', '핵심 단어', '산양 서식지'], ['공통', '핵심 단어', '아고산대 식생'],
+    ['공통', '핵심 단어', '회복에 수십 년'], ['공통', '핵심 단어', '생태 복원 기금'], ['공통', '핵심 단어', '의무 적립'], ['공통', '핵심 단어', '관람 구역 제한'],
+    ['공통', '핵심 단어', '과태료'], ['공통', '핵심 단어', '조건부 운영'], ['공통', '핵심 단어', '생태 보전 기준'], ['공통', '핵심 단어', '정상 탐방로 제한']
+  ], [80, 90, 560]);
 
   make(SH.LOG, [LOG_HEAD], [70, 130, 60, 50, 80, 90, 220, 110, 220, 220, 70, 60, 50]);
 
@@ -202,13 +229,14 @@ function sections0_() {
 function flaws_() { return cached_('flaws', flaws0_); }
 function flaws0_() {
   return rows_(SH.FLAW).filter(r => r[0]).map(r => ({
-    code: String(r[0]).trim(), section: String(r[1]), keys: String(r[2]).split(',').map(s => s.trim()).filter(Boolean),
+    code: String(r[0]).trim(), section: String(r[1]), keys: keyStr_(r[2]).split(',').map(s => s.trim()).filter(Boolean),
     card: String(r[3]).trim(), role: String(r[4]).trim(), evidence: String(r[5]).trim(), note: String(r[6])
   }));
 }
 
 function data_() { return cached_('data', () => rows_(SH.DATA).filter(r => r[0]).map(r => ({ id: String(r[0]).trim(), name: String(r[1]), loc: String(r[2]), text: String(r[3]) }))); }
 function clues_() { return cached_('clues', () => { const o = {}; rows_(SH.CLUE).forEach(r => o[String(r[0]).trim()] = String(r[1])); return o; }); }
+function phrases_() { return cached_('phrases', () => rows_(SH.PHRASE).filter(r => String(r[2]).trim()).map(r => ({ section: String(r[0]).trim(), kind: String(r[1]).trim(), text: String(r[2]) }))); }
 function zones_() { return cached_('zones', () => { const o = {}; rows_(SH.ZONE).forEach(r => o[Number(r[0])] = String(r[1]).split(',').map(s => s.trim()).filter(Boolean)); return o; }); }
 
 /* 상태(라운드)는 스크립트 속성에 */
@@ -232,24 +260,31 @@ function log_() {
   if (hit) return JSON.parse(hit);
   const list = rows_(SH.LOG).filter(r => r[0] && String(r[12]).trim() === '').map(r => ({
     id: String(r[0]), time: r[1] instanceof Date ? r[1].getTime() : 0, type: String(r[2]), group: Number(r[3]), role: String(r[4]),
-    keys: String(r[5]).split(',').filter(Boolean), quote: String(r[6]), card: String(r[7]), problem: String(r[8]), fix: String(r[9]),
+    keys: keyStr_(r[5]).split(',').filter(Boolean), quote: String(r[6]), card: String(r[7]), problem: String(r[8]), fix: String(r[9]),
     result: String(r[10]), target: String(r[11])
   }));
   try { cache.put('log', JSON.stringify(list), 3); } catch (e) {}
   return list;
 }
 function bust_() { CacheService.getScriptCache().remove('log'); }
-function bustAll_() { CacheService.getScriptCache().removeAll(['log', 'conf', 'secs', 'flaws', 'data', 'clues', 'zones']); }
+function bustAll_() { CacheService.getScriptCache().removeAll(['log', 'conf', 'secs', 'flaws', 'data', 'clues', 'zones', 'phrases']); }
 
 function append_(row) {
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
     const id = Utilities.getUuid().slice(0, 8);
-    sheet_(SH.LOG).appendRow([id, new Date()].concat(row));
+    const log = sheet_(SH.LOG);
+    log.appendRow([id, new Date()].concat(row.map(v => typeof v === 'string' && /^\d+-\d+$/.test(v) ? "'" + v : v)));
     bust_();
     return id;
   } finally { lock.releaseLock(); }
+}
+
+/* 시트가 "1-1" 같은 문장번호를 날짜(1월 1일)로 바꿔 버린 경우 되돌림 */
+function keyStr_(v) {
+  if (v instanceof Date) return Utilities.formatDate(v, SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(), 'M-d');
+  return String(v).replace(/^'/, '');
 }
 
 function need_(cond, msg) { if (!cond) throw new Error(msg); }
@@ -305,7 +340,7 @@ function boot() {
     title: conf.title, groups: conf.groups, roles: conf.roles, phases: PHASES,
     cards: CARDS.map(c => ({ name: c[0], desc: c[1] })),
     sections: sections_().map(s => ({ name: s.name, sentences: s.sentences })),
-    clues: clues_(), zones: zones_(), flawCount: flaws_().length, hintCost: conf.hintCost, reviewChecks: REVIEW_CHECKS,
+    clues: clues_(), zones: zones_(), flawCount: flaws_().length, hintCost: conf.hintCost, reviewChecks: REVIEW_CHECKS, phrases: phrases_(),
     state: getState_()
   };
 }
@@ -345,9 +380,20 @@ function studentState(group) {
     rewrites: st.phase >= 3 ? rewrites : { [group]: rewrites[group] || {} },
     reviews: reviews,
     selfs: mine.filter(e => e.type === 'self').map(e => ({ role: e.role, card: e.card, problem: e.problem, fix: e.fix })),
+    zoneFlaws: st.phase >= 2 ? zoneFlaws_(group, flaws, found) : [],
     foundCards: st.phase >= 4 ? classCards_(log, flaws) : [],
     result: st.phase >= 5 && st.reveal ? resultPack_(log, flaws, conf) : null
   };
+}
+
+function zoneFlaws_(group, flaws, found) {
+  const zone = zones_()[group] || [];
+  const secs = sections_().map(s => s.name);
+  return flaws.filter(f => f.keys.some(k => zone.indexOf(secs[Number(k.split('-')[0])]) >= 0)).map(f => ({
+    code: f.code, card: f.card, note: f.note, evidence: f.evidence,
+    sections: [...new Set(f.keys.map(k => secs[Number(k.split('-')[0])]).filter(n => zone.indexOf(n) >= 0))],
+    found: !!(found[f.code] && found[f.code].kind === 'full')
+  }));
 }
 
 function classCards_(log, flaws) {
@@ -364,9 +410,7 @@ function submitFind(p) {
   const keys = (p.keys || []).map(String).filter(k => /^\d+-\d+$/.test(k)).slice(0, 8);
   need_(keys.length, '문장을 하나 이상 골라 주세요.');
   need_(CARDS.some(c => c[0] === p.card), '결함 카드를 하나 골라 주세요.');
-  const problem = clean_(p.problem), fix = clean_(p.fix);
-  need_(problem.replace(/\s/g, '').length >= 8, '무엇이 문제인지 조금 더 자세히 적어 주세요. (8자 이상)');
-  need_(fix.replace(/\s/g, '').length >= 8, '어떻게 바꾸면 좋을지 조금 더 자세히 적어 주세요. (8자 이상)');
+  const problem = clean_(p.problem, 300), fix = '';   // 1라운드는 문제 표시만. 고치기는 2라운드에서
 
   // 판정
   const flaws = flaws_();
