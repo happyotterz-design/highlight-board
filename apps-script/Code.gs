@@ -193,7 +193,7 @@ function doPost(e) {
 
 /* ================= 읽기 도우미 ================= */
 function sheet_(n) { return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(n); }
-function rows_(n) { const s = sheet_(n); return s.getLastRow() < 2 ? [] : s.getRange(2, 1, s.getLastRow() - 1, s.getLastColumn()).getValues(); }
+function rows_(n) { const s = sheet_(n); if (!s) return []; return s.getLastRow() < 2 ? [] : s.getRange(2, 1, s.getLastRow() - 1, s.getLastColumn()).getValues(); }
 
 function cached_(k, fn) {
   const c = CacheService.getScriptCache(), h = c.get(k);
