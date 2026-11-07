@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#f6f5f1; --card:#ffffff; --ink:#22252a; --muted:#6b7078; --line:#dedbd2;
+    --pick:#ffe36e; --mine:#fff4bf; --accent:#2f5d8a; --danger:#b3412f;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif;-webkit-text-size-adjust:100%}
+  header{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line);padding:10px 16px}
+  h1{font-size:17px;margin:0 0 8px}
+  .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}
+  .label{font-size:13px;color:var(--muted);min-width:34px}
+  .chip{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:8px 14px;font-size:15px;min-height:40px;cursor:pointer}
+  .chip.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  main{max-width:860px;margin:0 auto;padding:14px 16px 220px}
+  .guide{font-size:14px;color:var(--muted);margin:2px 0 12px;line-height:1.5}
+  .sec{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+  .sec h2{font-size:13px;margin:0 0 6px;color:var(--accent)}
+  .txt{font-size:18px;line-height:1.85;word-break:keep-all}
+  .s{cursor:pointer;border-radius:4px;padding:1px 0;transition:background .1s}
+  .s.mine{background:var(--mine);box-shadow:inset 0 -2px 0 #e7c84a}
+  .s.pick{background:var(--pick)}
+  .panel{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--card);border-top:2px solid var(--accent);box-shadow:0 -6px 20px rgba(0,0,0,.08);padding:12px 16px 16px;transform:translateY(105%);transition:transform .2s}
+  .panel.show{transform:none}
+  .panel .inner{max-width:860px;margin:0 auto}
+  .quote{font-size:14px;background:#fff9d6;border-left:4px solid #e7c84a;padding:6px 10px;margin-bottom:8px;max-height:64px;overflow:auto}
+  label{display:block;font-size:14px;font-weight:600;margin:6px 0 4px}
+  textarea{width:100%;font-size:16px;padding:8px 10px;border:1.5px solid var(--line);border-radius:8px;resize:vertical;min-height:56px;font-family:inherit}
+  .btns{display:flex;gap:8px;margin-top:10px}
+  button.main{flex:1;background:var(--accent);color:#fff;border:0;border-radius:10px;font-size:16px;font-weight:600;padding:12px}
+  button.sub{background:#fff;border:1.5px solid var(--line);border-radius:10px;font-size:15px;padding:12px 16px}
+  button:disabled{opacity:.5}
+  .msg{font-size:14px;margin-top:6px;min-height:18px}
+  .msg.err{color:var(--danger)}
+  .mylist h3{font-size:15px;margin:22px 0 8px}
+  .item{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:15px;line-height:1.55}
+  .item .q{color:var(--muted);font-size:13px;margin-bottom:4px}
+  .item .tag{display:inline-block;font-size:12px;border-radius:6px;padding:1px 7px;color:#fff;margin-right:6px}
+  .item .del{float:right;border:0;background:none;color:var(--danger);font-size:13px;padding:4px}
+  .lock{position:fixed;inset:0;background:rgba(246,245,241,.96);z-index:20;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;font-size:18px}
+  .lock.show{display:flex}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">형광펜 의견판</h1>
+  <div class="row"><span class="label">모둠</span><div id="groups" class="row" style="margin:0"></div></div>
+  <div class="row"><span class="label">역할</span><div id="roles" class="row" style="margin:0"></div></div>
+</header>
+
+<main>
+  <p class="guide">① 모둠과 역할을 고릅니다. ② 문제가 있다고 생각하는 문장을 누릅니다(여러 문장 가능). ③ 아래 칸에 무엇이 문제인지, 어떻게 바꾸면 좋을지 적고 올립니다.</p>
+  <div id="text">불러오는 중...</div>
+  <div class="mylist"><h3 id="myhead">우리 모둠 의견</h3><div id="mine"></div></div>
+</main>
+
+<div class="panel" id="panel"><div class="inner">
+  <div class="quote" id="quote"></div>
+  <label for="problem">무엇이 문제인가요? (내 역할의 눈으로)</label>
+  <textarea id="problem" maxlength="500" placeholder="예) 출처가 '여행 블로그'라서 믿기 어렵다."></textarea>
+  <label for="fix">이렇게 바꾸자</label>
+  <textarea id="fix" maxlength="500" placeholder="예) 자료 6의 고령층 설문(62%)으로 바꾸고 위치를 적는다."></textarea>
+  <div class="btns">
+    <button class="sub" id="cancel">선택 취소</button>
+    <button class="main" id="send">의견 올리기</button>
+  </div>
+  <div class="msg" id="msg"></div>
+</div></div>
+
+<div class="lock" id="lock">지금은 의견을 받지 않고 있어요.<br>선생님 안내를 기다려 주세요.</div>
+
+<script>
+const ROLE_COLORS = ['#2f6fb0','#7b4fa8','#c76a1c','#2f8a57','#b0405e','#4f7f8a','#8a7a2f','#555'];
+let CONF = null, COMMENTS = [], picked = new Set();
+let state = { group: null, role: null };
+try { state = Object.assign(state, JSON.parse(localStorage.getItem('hl_state') || '{}')); } catch(e) {}
+
+const $ = id => document.getElementById(id);
+function save(){ try { localStorage.setItem('hl_state', JSON.stringify(state)); } catch(e) {} }
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* 서버 주소: Apps Script 웹앱 /exec 주소 */
+const API_URL = 'https://script.google.com/macros/s/AKfycbyyk05Wu6D3DUrO4F8wzG2DGzP9UUEnU8Bmi8qERaXupv2Cv9jutUMPe6v3zq-4XLIZag/exec';
+function call(fn, ...args){
+  if (API_URL && API_URL.indexOf('http') === 0) {
+    return fetch(API_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ fn, args }) })
+      .then(r => r.json())
+      .then(j => { if (!j.ok) throw j.error; return j.data; })
+      .catch(e => { throw (typeof e === 'string' ? e : '연결이 잠깐 끊겼어요. 다시 눌러 주세요.'); });
+  }
+  return new Promise((res, rej) => {
+    if (window.google && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(res).withFailureHandler(e => rej(e && e.message ? e.message : String(e)))[fn](...args);
+    } else { Promise.resolve().then(() => res(MOCK[fn](...args))).catch(e => rej(e.message)); }
+  });
+}
+
+function renderTop(){
+  $('title').textContent = CONF.title || '형광펜 의견판';
+  let g = '';
+  for (let i = 1; i <= CONF.groups; i++) g += `<button class="chip ${state.group===i?'on':''}" data-g="${i}">${i}모둠</button>`;
+  $('groups').innerHTML = g;
+  $('roles').innerHTML = CONF.roles.map(r => `<button class="chip ${state.role===r?'on':''}" data-r="${esc(r)}">${esc(r)}</button>`).join('');
+  $('lock').classList.toggle('show', !CONF.open);
+}
+
+function renderText(){
+  const mineKeys = new Set();
+  COMMENTS.filter(c => c.group === state.group).forEach(c => c.keys.forEach(k => mineKeys.add(k)));
+  $('text').innerHTML = CONF.sections.map((sec, si) =>
+    `<div class="sec"><h2>${esc(sec.name)}</h2><div class="txt">` +
+    sec.sentences.map((s, j) => {
+      const k = si + '-' + j;
+      return `<span class="s ${picked.has(k)?'pick':''} ${mineKeys.has(k)?'mine':''}" data-k="${k}">${esc(s)}</span> `;
+    }).join('') + `</div></div>`).join('');
+}
+
+function sentenceOf(k){ const [a,b] = k.split('-').map(Number); return CONF.sections[a] ? CONF.sections[a].sentences[b] : ''; }
+function sectionOf(k){ const a = Number(k.split('-')[0]); return CONF.sections[a] ? CONF.sections[a].name : ''; }
+function sortKeys(arr){ return arr.sort((x,y)=>{const [a,b]=x.split('-').map(Number),[c,d]=y.split('-').map(Number);return a-c||b-d;}); }
+
+function renderPanel(){
+  const show = picked.size > 0;
+  $('panel').classList.toggle('show', show);
+  if (!show) return;
+  const keys = sortKeys([...picked]);
+  $('quote').innerHTML = keys.map(k => `<b>[${esc(sectionOf(k))}]</b> ${esc(sentenceOf(k))}`).join('<br>');
+}
+
+function renderMine(){
+  const roleIdx = r => Math.max(0, CONF.roles.indexOf(r));
+  const list = COMMENTS.filter(c => c.group === state.group).sort((a,b)=>b.time-a.time);
+  $('myhead').textContent = state.group ? `${state.group}모둠 의견 (${list.length})` : '우리 모둠 의견';
+  $('mine').innerHTML = !state.group ? '<p class="guide">모둠을 고르면 우리 모둠이 올린 의견이 여기 보여요.</p>' :
+    (list.length ? '' : '<p class="guide">아직 올린 의견이 없어요.</p>') +
+    list.map(c => `<div class="item"><button class="del" data-id="${esc(c.id)}">지우기</button>
+      <span class="tag" style="background:${ROLE_COLORS[roleIdx(c.role)%8]}">${esc(c.role)}</span>
+      <div class="q">${esc(c.keys.map(sectionOf).filter((v,i,a)=>a.indexOf(v)===i).join(', '))} · ${esc(c.quote).slice(0,80)}${c.quote.length>80?'…':''}</div>
+      <div><b>문제:</b> ${esc(c.problem)}</div><div><b>바꾸자:</b> ${esc(c.fix)}</div></div>`).join('');
+}
+
+function renderAll(){ renderTop(); renderText(); renderPanel(); renderMine(); }
+
+function setMsg(t, err){ $('msg').textContent = t; $('msg').className = 'msg' + (err ? ' err' : ''); }
+
+document.addEventListener('click', e => {
+  const g = e.target.closest('[data-g]'); if (g){ state.group = Number(g.dataset.g); save(); renderAll(); return; }
+  const r = e.target.closest('[data-r]'); if (r){ state.role = r.dataset.r; save(); renderTop(); return; }
+  const s = e.target.closest('.s'); if (s){ const k = s.dataset.k; picked.has(k) ? picked.delete(k) : picked.add(k); setMsg(''); renderText(); renderPanel(); return; }
+  const d = e.target.closest('.del');
+  if (d){
+    if (!confirmInline(d)) return;
+    call('deleteComment', d.dataset.id, state.group).then(refresh).catch(err => alertBox(err));
+  }
+});
+
+/* 지우기는 두 번 눌러야 실행 (실수 방지, 팝업 없이) */
+function confirmInline(btn){
+  if (btn.dataset.armed){ return true; }
+  btn.dataset.armed = '1'; btn.textContent = '한 번 더 누르면 지워져요';
+  setTimeout(() => { if (btn.isConnected){ delete btn.dataset.armed; btn.textContent = '지우기'; } }, 3000);
+  return false;
+}
+function alertBox(t){ setMsg(String(t), true); }
+
+$('cancel').onclick = () => { picked.clear(); setMsg(''); renderText(); renderPanel(); };
+$('send').onclick = () => {
+  if (!state.group) return setMsg('위에서 모둠을 먼저 골라 주세요.', true);
+  if (!state.role) return setMsg('위에서 역할을 먼저 골라 주세요.', true);
+  const problem = $('problem').value.trim(), fix = $('fix').value.trim();
+  if (!problem || !fix) return setMsg('문제점과 바꿀 방법을 모두 적어 주세요.', true);
+  const keys = sortKeys([...picked]);
+  const quote = keys.map(sentenceOf).join(' ');
+  $('send').disabled = true; setMsg('올리는 중...');
+  call('addComment', { group: state.group, role: state.role, keys, quote, problem, fix })
+    .then(() => { $('problem').value = ''; $('fix').value = ''; picked.clear(); setMsg('올렸어요.'); return refresh(); })
+    .catch(err => setMsg(err, true))
+    .finally(() => { $('send').disabled = false; });
+};
+
+function refresh(){
+  return call('getComments').then(c => { COMMENTS = c; renderText(); renderMine(); renderPanel(); });
+}
+
+function boot(){
+  call('getConfig').then(conf => {
+    CONF = conf;
+    if (state.group && state.group > CONF.groups) state.group = null;
+    if (state.role && CONF.roles.indexOf(state.role) < 0) state.role = null;
+    renderAll(); return refresh();
+  }).catch(err => { $('text').textContent = '불러오지 못했어요: ' + err; });
+}
+setInterval(() => { if (CONF) call('getConfig').then(c => { CONF.open = c.open; $('lock').classList.toggle('show', !c.open); }).catch(()=>{}); }, 20000);
+
+/* ---- 연습용 가짜 서버 (구글 밖에서 열었을 때만) ---- */
+const MOCK = (() => {
+  let store = [];
+  return {
+    getConfig: () => ({ title:'예시 논증문 A (연습 화면)', groups:6, roles:['팩트체크','윤리·공정','현실·실행','환경·미래'], open:true,
+      sections:[{name:'탐구 질문',sentences:['환경공학자의 시선에서, 설악산 오색 케이블카는 설치되어야 하는가?']},
+                {name:'본론 1',sentences:['케이블카가 필요한 가장 큰 이유는 접근성이다.','어떤 여행 블로그에 따르면 케이블카 설치를 원하는 사람이 70%나 된다고 한다.']}]}),
+    getComments: () => store.slice(),
+    addComment: c => { store.push(Object.assign({id:Math.random().toString(36).slice(2,8),time:Date.now()},c)); return 'ok'; },
+    deleteComment: (id,g) => { store = store.filter(c => !(c.id===id && c.group===g)); return true; }
+  };
+})();
+boot();
+</script>
+</body>
+</html>

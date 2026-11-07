@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{ --bg:#f4f3ee; --card:#fff; --ink:#1f2227; --muted:#676c74; --line:#dcd8cd; --accent:#2f5d8a; --fs:24px; }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif;display:flex;flex-direction:column}
+  header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 18px;background:var(--card);border-bottom:1px solid var(--line)}
+  header h1{font-size:20px;margin:0 12px 0 0}
+  .count{font-size:16px;color:var(--muted)}
+  .chip{border:2px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .chip .dot{width:12px;height:12px;border-radius:50%}
+  .chip.off{opacity:.35}
+  .chip.on{border-color:var(--accent);background:var(--accent);color:#fff}
+  select{font-size:16px;padding:6px 8px;border-radius:8px;border:2px solid var(--line)}
+  .sp{flex:1}
+  .tool{border:2px solid var(--line);background:#fff;border-radius:8px;font-size:16px;padding:6px 12px;cursor:pointer}
+  .wrap{flex:1;display:flex;min-height:0}
+  #text{flex:1.4;overflow:auto;padding:18px 22px}
+  #side{flex:1;overflow:auto;padding:18px;border-left:1px solid var(--line);background:#fbfaf7}
+  .sec{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:12px}
+  .sec h2{font-size:calc(var(--fs)*.6);margin:0 0 6px;color:var(--accent)}
+  .txt{font-size:var(--fs);line-height:1.8;word-break:keep-all}
+  .s{cursor:pointer;border-radius:5px;padding:2px 1px;position:relative}
+  .s.sel{outline:3px solid var(--accent);outline-offset:1px}
+  .dots{display:inline-flex;gap:2px;vertical-align:super;margin-left:2px}
+  .dots i{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .n{font-size:calc(var(--fs)*.5);font-weight:700;color:#8a5a00;vertical-align:super;margin-left:1px}
+  #side h3{font-size:calc(var(--fs)*.75);margin:0 0 10px}
+  .hint{color:var(--muted);font-size:calc(var(--fs)*.65);line-height:1.6}
+  .q{font-size:calc(var(--fs)*.7);background:#fff6c9;border-left:5px solid #e3c23d;padding:8px 12px;margin-bottom:12px;line-height:1.55}
+  .cm{background:var(--card);border:1px solid var(--line);border-left-width:6px;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:calc(var(--fs)*.72);line-height:1.55}
+  .cm .meta{font-size:calc(var(--fs)*.55);color:var(--muted);margin-bottom:4px}
+  .cm b{font-weight:700}
+  .grp{margin-bottom:18px}
+  .grp h4{font-size:calc(var(--fs)*.7);margin:0 0 8px;display:flex;align-items:center;gap:8px}
+  .grp h4 .dot{width:14px;height:14px;border-radius:50%}
+  .big #text{display:none}
+  .big #side{border-left:0}
+  .legend{font-size:14px;color:var(--muted)}
+  .heatbar{display:inline-block;width:90px;height:12px;border-radius:6px;vertical-align:middle;background:linear-gradient(90deg,rgba(255,214,0,.12),rgba(255,170,0,.85))}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">형광펜 의견판</h1>
+  <span class="count" id="count"></span>
+  <span id="roleChips"></span>
+  <select id="groupSel"></select>
+  <span class="legend">적음 <span class="heatbar"></span> 많음</span>
+  <span class="sp"></span>
+  <button class="tool" id="modeBtn">역할별 모아보기</button>
+  <button class="tool" id="bigBtn">의견 크게</button>
+  <button class="tool" id="minus">가-</button>
+  <button class="tool" id="plus">가+</button>
+  <button class="tool" id="pause">자동 새로고침 켜짐</button>
+</header>
+<div class="wrap" id="wrap">
+  <div id="text">불러오는 중...</div>
+  <div id="side"></div>
+</div>
+
+<script>
+const ROLE_COLORS = ['#2f6fb0','#7b4fa8','#c76a1c','#2f8a57','#b0405e','#4f7f8a','#8a7a2f','#555'];
+let CONF = null, COMMENTS = [], sel = null, mode = 'sentence', auto = true;
+const roleOn = {};
+let groupFilter = 0, fs = 24;
+try { fs = Number(localStorage.getItem('hl_fs')) || 24; } catch(e) {}
+
+const $ = id => document.getElementById(id);
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function color(r){ return ROLE_COLORS[Math.max(0, CONF.roles.indexOf(r)) % ROLE_COLORS.length]; }
+/* 서버 주소: Apps Script 웹앱 /exec 주소 */
+const API_URL = 'https://script.google.com/macros/s/AKfycbyyk05Wu6D3DUrO4F8wzG2DGzP9UUEnU8Bmi8qERaXupv2Cv9jutUMPe6v3zq-4XLIZag/exec';
+function call(fn, ...args){
+  if (API_URL && API_URL.indexOf('http') === 0) {
+    return fetch(API_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ fn, args }) })
+      .then(r => r.json())
+      .then(j => { if (!j.ok) throw j.error; return j.data; })
+      .catch(e => { throw (typeof e === 'string' ? e : '연결이 잠깐 끊겼어요. 다시 눌러 주세요.'); });
+  }
+  return new Promise((res, rej) => {
+    if (window.google && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(res).withFailureHandler(e => rej(e && e.message ? e.message : String(e)))[fn](...args);
+    } else { Promise.resolve().then(() => res(MOCK[fn](...args))).catch(e => rej(e.message)); }
+  });
+}
+function visible(){ return COMMENTS.filter(c => roleOn[c.role] !== false && (!groupFilter || c.group === groupFilter)); }
+function sectionOf(k){ const a = Number(k.split('-')[0]); return CONF.sections[a] ? CONF.sections[a].name : ''; }
+function sentenceOf(k){ const [a,b] = k.split('-').map(Number); return CONF.sections[a] ? CONF.sections[a].sentences[b] : ''; }
+
+function renderHeader(){
+  $('title').textContent = CONF.title || '형광펜 의견판';
+  $('roleChips').innerHTML = CONF.roles.map(r =>
+    `<button class="chip ${roleOn[r]===false?'off':''}" data-role="${esc(r)}"><span class="dot" style="background:${color(r)}"></span>${esc(r)}</button>`).join(' ');
+  let o = '<option value="0">전체 모둠</option>';
+  for (let i = 1; i <= CONF.groups; i++) o += `<option value="${i}" ${groupFilter===i?'selected':''}>${i}모둠</option>`;
+  $('groupSel').innerHTML = o;
+  $('modeBtn').textContent = mode === 'sentence' ? '역할별 모아보기' : '문장별 보기';
+}
+
+function renderText(){
+  const list = visible();
+  const byKey = {};
+  list.forEach(c => c.keys.forEach(k => (byKey[k] = byKey[k] || []).push(c)));
+  const max = Math.max(1, ...Object.values(byKey).map(a => a.length));
+  $('count').textContent = `의견 ${list.length}개`;
+  $('text').innerHTML = CONF.sections.map((sec, si) =>
+    `<div class="sec"><h2>${esc(sec.name)}</h2><div class="txt">` +
+    sec.sentences.map((s, j) => {
+      const k = si + '-' + j, arr = byKey[k] || [];
+      const a = arr.length ? (0.15 + 0.7 * arr.length / max) : 0;
+      const bg = arr.length ? `background:rgba(255,${Math.round(214 - 44 * arr.length / max)},0,${a.toFixed(2)})` : '';
+      const roles = [...new Set(arr.map(c => c.role))];
+      const dots = roles.length ? `<span class="dots">${roles.map(r => `<i style="background:${color(r)}"></i>`).join('')}</span><span class="n">${arr.length}</span>` : '';
+      return `<span class="s ${sel===k?'sel':''}" data-k="${k}" style="${bg}">${esc(s)}</span>${dots} `;
+    }).join('') + `</div></div>`).join('');
+}
+
+function cmHTML(c, showQuote){
+  return `<div class="cm" style="border-left-color:${color(c.role)}">
+    <div class="meta">${c.group}모둠 · ${esc(c.role)}${showQuote ? ' · ' + esc([...new Set(c.keys.map(sectionOf))].join(', ')) : ''}</div>
+    ${showQuote ? `<div class="meta">“${esc(c.quote.length>70?c.quote.slice(0,70)+'…':c.quote)}”</div>` : ''}
+    <div><b>문제</b> ${esc(c.problem)}</div><div><b>바꾸자</b> ${esc(c.fix)}</div></div>`;
+}
+
+function renderSide(){
+  const list = visible();
+  if (mode === 'roles'){
+    $('side').innerHTML = `<h3>역할별 의견 모아보기</h3>` + CONF.roles.filter(r => roleOn[r] !== false).map(r => {
+      const arr = list.filter(c => c.role === r).sort((a,b) => a.keys[0] < b.keys[0] ? -1 : 1);
+      return `<div class="grp"><h4><span class="dot" style="background:${color(r)}"></span>${esc(r)} (${arr.length})</h4>${arr.map(c => cmHTML(c, true)).join('') || '<p class="hint">아직 없음</p>'}</div>`;
+    }).join('');
+    return;
+  }
+  if (!sel){
+    const byKey = {};
+    list.forEach(c => c.keys.forEach(k => byKey[k] = (byKey[k]||0) + 1));
+    const top = Object.entries(byKey).sort((a,b) => b[1]-a[1]).slice(0, 5);
+    $('side').innerHTML = `<h3>의견이 많이 모인 문장</h3>` +
+      (top.length ? top.map(([k,n]) => `<div class="q" data-k="${k}" style="cursor:pointer"><b>${n}개</b> · [${esc(sectionOf(k))}] ${esc(sentenceOf(k))}</div>`).join('')
+                  : '<p class="hint">학생들이 의견을 올리면 여기에 순위가 보입니다.</p>') +
+      `<p class="hint">문장을 누르면 그 문장에 달린 의견만 크게 볼 수 있어요.</p>`;
+    return;
+  }
+  const arr = list.filter(c => c.keys.indexOf(sel) >= 0).sort((a,b) => CONF.roles.indexOf(a.role) - CONF.roles.indexOf(b.role) || a.group - b.group);
+  $('side').innerHTML = `<div class="q">[${esc(sectionOf(sel))}] ${esc(sentenceOf(sel))}</div>
+    <h3>이 문장에 달린 의견 ${arr.length}개 <button class="tool" id="clearSel" style="float:right;font-size:14px">닫기</button></h3>` +
+    (arr.map(c => cmHTML(c, false)).join('') || '<p class="hint">이 문장에는 아직 의견이 없어요.</p>');
+}
+
+function renderAll(){
+  document.documentElement.style.setProperty('--fs', fs + 'px');
+  renderHeader(); renderText(); renderSide();
+}
+
+document.addEventListener('click', e => {
+  const r = e.target.closest('[data-role]');
+  if (r){ const n = r.dataset.role; roleOn[n] = roleOn[n] === false; renderAll(); return; }
+  if (e.target.id === 'clearSel'){ sel = null; renderAll(); return; }
+  const s = e.target.closest('[data-k]');
+  if (s){ sel = sel === s.dataset.k ? null : s.dataset.k; mode = 'sentence'; renderAll(); }
+});
+$('groupSel').onchange = e => { groupFilter = Number(e.target.value); renderAll(); };
+$('modeBtn').onclick = () => { mode = mode === 'sentence' ? 'roles' : 'sentence'; renderAll(); };
+$('bigBtn').onclick = () => { const on = $('wrap').classList.toggle('big'); $('bigBtn').textContent = on ? '글과 같이 보기' : '의견 크게'; };
+$('plus').onclick = () => { fs = Math.min(44, fs + 2); try{localStorage.setItem('hl_fs', fs);}catch(e){} renderAll(); };
+$('minus').onclick = () => { fs = Math.max(14, fs - 2); try{localStorage.setItem('hl_fs', fs);}catch(e){} renderAll(); };
+$('pause').onclick = () => { auto = !auto; $('pause').textContent = auto ? '자동 새로고침 켜짐' : '자동 새로고침 멈춤'; };
+
+function refresh(){
+  return call('getComments').then(c => {
+    const before = JSON.stringify(COMMENTS);
+    COMMENTS = c;
+    if (JSON.stringify(c) !== before) { renderText(); renderSide(); }
+  });
+}
+setInterval(() => { if (CONF && auto) refresh().catch(()=>{}); }, 5000);
+
+/* ---- 연습용 가짜 데이터 (구글 밖에서 열었을 때만) ---- */
+const MOCK = {
+  getConfig: () => ({ title:'예시 논증문 A (연습 화면)', groups:6, roles:['팩트체크','윤리·공정','현실·실행','환경·미래'], open:true,
+    sections:[{name:'탐구 질문',sentences:['환경공학자의 시선에서, 설악산 오색 케이블카는 설치되어야 하는가?']},
+              {name:'본론 1',sentences:['케이블카가 필요한 가장 큰 이유는 접근성이다.','현재 오색에서 대청봉까지는 걸어서 4~5시간이 걸리기 때문에 노약자나 장애인은 정상에 오르기 어렵다.','어떤 여행 블로그에 따르면 케이블카 설치를 원하는 사람이 70%나 된다고 한다.']},
+              {name:'본론 2',sentences:['하지만 공사는 몇 년이면 끝나기 때문에 큰 문제가 아니다.']}]}),
+  getComments: () => [
+    {id:'a',time:1,group:1,role:'팩트체크',keys:['1-2'],quote:'어떤 여행 블로그에 따르면 케이블카 설치를 원하는 사람이 70%나 된다고 한다.',problem:'블로그는 믿을 만한 출처가 아니다.',fix:'자료 6 설문으로 바꾸고 위치를 쓴다.'},
+    {id:'b',time:2,group:2,role:'윤리·공정',keys:['1-2'],quote:'어떤 여행 블로그에 따르면 케이블카 설치를 원하는 사람이 70%나 된다고 한다.',problem:'원하는 사람이 많다고 옳은 건 아니다.',fix:'누구의 권리 문제인지로 바꾼다.'},
+    {id:'c',time:3,group:3,role:'환경·미래',keys:['2-0'],quote:'하지만 공사는 몇 년이면 끝나기 때문에 큰 문제가 아니다.',problem:'아고산대 식생 회복은 수십 년 걸린다.',fix:'자료 2 · 3번째 문단을 근거로 한계를 인정한다.'},
+    {id:'d',time:4,group:4,role:'팩트체크',keys:['1-2'],quote:'',problem:'70%가 누구를 대상으로 한 조사인지 없다.',fix:'조사 대상과 기관을 밝힌다.'}
+  ]
+};
+
+/* 시작 */
+call('getConfig').then(conf => { CONF = conf; renderAll(); return refresh(); })
+  .catch(err => { $('text').textContent = '불러오지 못했어요: ' + err; });
+</script>
+</body>
+</html>
