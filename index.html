@@ -164,7 +164,7 @@ textarea{resize:vertical;min-height:58px}
 <div class="sheet" id="sheet"><div class="inner" id="sheetInner"></div></div>
 <div class="verdict" id="verdict"><div class="vbox" id="vbox"></div></div>
 
-<script src="common.js?v=18"></script>
+<script src="common.js?v=19"></script>
 <script>
 let B = null;              // boot: 글, 카드, 단서, 구역
 let S = null;              // 우리 모둠 상태
@@ -400,10 +400,10 @@ function helpHTML(sec, items) {
   const now = normT(items.filter(i => i.sec === sec && !i.del).map(i => i.text).join(' '));
   let h = `<div class="helpbox"><div class="m"><b>🆘 문장 도움 · ${esc(sec)}</b> · 막히면 모둠이 같이 열어 보세요. 열면 명탐정 기자 점수에서 빠져요.</div>`;
   if (lv >= 1) h += `<div class="m" style="margin-top:6px">① 이 구간에 들어가면 좋은 것 <span class="muted">(초록색은 이미 들어 있어요)</span></div><div>${H.elements.map(a => `<span class="el ${a.some(x => now.indexOf(normT(x)) >= 0) ? 'ok' : ''}">${esc(a[0])}</span>`).join('')}</div>`;
-  if (lv >= 2) h += `<div class="m" style="margin-top:8px">② 예시 문장 <span class="muted">· 그대로 옮기면 투표 1등을 해도 베스트 점수를 받지 못해요. 우리 말로 바꿔 쓰세요.</span></div><div class="model">${esc(H.model)}</div>`;
-  h += `<div class="btns" style="margin-top:8px">` +
+  if (lv >= 2) h += `<div class="m" style="margin-top:8px">② 예시 문장 <span style="color:var(--stamp);font-weight:700">· 예시 문장과 80% 이상 겹치면 투표 1등을 해도 베스트 점수(+3)를 받지 못해요.</span> <span class="muted">우리 말로 바꿔 쓰세요.</span></div><div class="model">${esc(H.model)}</div>`;
+  h += `<div class="btns" style="margin-top:8px;flex-wrap:wrap">` +
     (lv < 1 ? `<button class="btn ghost" data-help="1" data-sec="${esc(sec)}">① 방향 보기 (−1)</button>` : '') +
-    (lv < 2 ? `<button class="btn ghost" data-help="2" data-sec="${esc(sec)}">② 예시 문장 보기 (${lv >= 1 ? '−1 더, 총 −2' : '총 −2'})</button>` : '') +
+    (lv < 2 ? `<button class="btn ghost" data-help="2" data-sec="${esc(sec)}">② 예시 문장 보기 (${lv >= 1 ? '−1 더, 총 −2' : '총 −2'})</button><div class="muted" style="width:100%;font-size:13px">② 예시 문장을 열면, 예시와 80% 이상 겹치는 글은 1등을 해도 베스트 +3이 없어요.</div>` : '') +
     `</div><div class="msg" id="helpMsg"></div></div>`;
   return h;
 }
@@ -583,6 +583,7 @@ document.addEventListener('click', e => {
   const pg = t.closest('[data-pg]'); if (pg) { me.group = Number(pg.dataset.pg); return renderPick(); }
   const pr = t.closest('[data-pr]'); if (pr) { me.role = pr.dataset.pr; return renderPick(); }
   if (t.id === 'viewEnter') { if (!me.group) return setMsg('viewMsg', '먼저 위에서 보고 싶은 모둠 번호를 눌러 주세요.', true); me.role = VIEW; me.who = '참관'; picking = false; store('case_me', me); S = null; lastSig = ''; render(); return poll(true); }
+  if (t.id === 'register' && $('whoInput') && ($('whoInput').value || '').trim() && me.group && me.role && !viewer()) setTimeout(joinMe, 50);
   if (t.id === 'register') { me.who = ($('whoInput').value || '').trim(); if (viewer() && !me.who) me.who = '참관'; if (!me.who) { $('whoInput').focus(); $('whoInput').placeholder = '이름을 꼭 써 주세요'; return; } picking = false; store('case_me', me); S = null; lastSig = ''; render(); return poll(true); }
   if (t.id === 'change') { if (confirm2(t, '다시 누르면 모둠·역할을 바꿔요')) { picking = true; render(); } return; }
   const tb = t.closest('[data-tab]'); if (tb) { tab = tb.dataset.tab; render(); return; }
@@ -684,7 +685,10 @@ function start() {
   }).catch(err => { $('main').innerHTML = `<div class="paper"><h2>연결하지 못했어요</h2><p class="muted">${esc(err)}</p><button class="go" onclick="location.reload()">다시 시도</button></div>`; });
 }
 setInterval(() => { if (B && document.visibilityState === 'visible') poll(false); }, 5000);
+/* 접속 명단: 등록할 때와 페이지를 열 때마다 서버에 알림 (칠판 '모둠 명단'용) */
+function joinMe() { if (!me.group || !me.role || viewer() || picking) return; call('join', who({ voter: VOTER })).catch(() => {}); }
 start();
+setTimeout(joinMe, 1500);
 </script>
 </body>
 </html>

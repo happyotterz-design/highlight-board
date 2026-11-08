@@ -180,7 +180,7 @@ function doPost(e) {
   try {
     const req = JSON.parse(e.postData.contents || '{}');
     const api = {
-      boot: boot, state: studentState, submitFind: submitFind, useHint: useHint, useHelp: useHelp,
+      boot: boot, state: studentState, submitFind: submitFind, useHint: useHint, useHelp: useHelp, join: join,
       saveLine: saveLine, submitRline: submitRline, submitReviewAll: submitReviewAll, submitSelf: submitSelf, submitVote: submitVote,
       board: boardState, setPhase: setPhase, toggleHide: toggleHide, checkPin: checkPin,
       admin: admin, openClass: openClass, addClass: addClass, resetClass: resetClass, setHidden: setHidden
@@ -504,6 +504,32 @@ function useHint(p) {
   const text = `${pick.section}에 「${pick.card}」 결함이 숨어 있다.`;
   append_(['hint', g, p.role, '', '', '', text, '', pick.code, '', ''], p.who);
   return { text };
+}
+
+/* ---------- 접속 명단: 태블릿이 등록할 때마다 기록 (기기마다 마지막 것만) ---------- */
+function join(p) {
+  needClass_();
+  const conf = conf_(); const g = Number(p.group); checkGroupRole_(g, p.role, conf);
+  const dev = String(p.voter || '').replace(/[^a-z0-9]/gi, '').slice(0, 20);
+  need_(dev.length >= 6, '기기 정보를 읽지 못했어요.');
+  const last = log_().filter(e => e.type === 'join' && e.keys[0] === dev).pop();
+  if (last && last.group === g && last.role === p.role && last.who === clean_(p.who, 60)) return { ok: true };
+  append_(['join', g, p.role, dev, '', '', '', '', '', '', ''], p.who);
+  return { ok: true };
+}
+function roster_(log, conf) {
+  const m = {};
+  log.filter(e => e.type === 'join').forEach(e => { m[e.keys[0] || e.id] = e; });
+  const out = {};
+  for (let g = 1; g <= conf.groups; g++) out[g] = { tablets: 0, roles: {} };
+  conf.roles.forEach(r => { for (let g = 1; g <= conf.groups; g++) out[g].roles[r] = []; });
+  Object.values(m).forEach(e => {
+    const G = out[e.group]; if (!G || !G.roles[e.role]) return;
+    G.tablets++;
+    String(e.who || '').split(/[,，]/).map(x => x.trim()).filter(Boolean).forEach(n => { if (G.roles[e.role].indexOf(n) < 0) G.roles[e.role].push(n); });
+    if (!String(e.who || '').trim()) G.roles[e.role].push('(이름 없음)');
+  });
+  return out;
 }
 
 /* ---------- 2라운드: 문장 도움 (구간별 2단계) ---------- */
@@ -877,6 +903,7 @@ function boardState(pin) {
     teacher, state: st,
     finds: log.filter(e => e.type === 'find').map(e => ({ id: e.id, group: e.group, role: e.role, keys: e.keys, card: e.card, problem: e.problem, fix: e.fix, hit: e.result.split(':')[0] || 'none' })),
     flawMap, progress, essays, changes, rlines, reviews, selfs,
+    roster: teacher ? roster_(log, conf) : null,
     vote: st.phase >= 4 ? { sections: candidates_(log, conf).map(x => ({ name: x.name, cands: x.cands.map(c => ({ g: c.g, parts: c.parts })) })), tally: votes_(log).tally, best: best_(log, conf), bestPts: conf.bestPts, voters: new Set(Object.values(votes_(log).latest).map(e => e.keys[0])).size } : null,
     result: st.phase >= 5 && st.reveal ? resultPack_(log, flaws, conf) : null
   };

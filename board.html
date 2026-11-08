@@ -116,15 +116,17 @@ header{display:flex;align-items:center;gap:14px;padding:10px 20px;color:#e8efec;
   <button class="tool" id="minus">가-</button><button class="tool" id="plus">가+</button>
   <button class="tool" id="peek" hidden></button>
   <button class="tool" id="present" hidden>🎤 베스트 발표</button>
+  <button class="tool" id="rosterBtn" hidden>👥 모둠 명단</button>
   <button class="tool" id="adminBtn" hidden>반·기록 관리</button>
   <button class="tool" id="loginBtn">교사 로그인</button>
 </header>
 <div class="wrap" id="wrap"><div class="col" style="flex:1;color:#c9d6d1">불러오는 중...</div></div>
+<div class="login" id="roster"><div class="box" style="width:min(1200px,96vw);max-height:92vh;overflow:auto;font-size:calc(var(--fs) * 1)" id="rosterBox"></div></div>
 <div class="login" id="admin"><div class="box" style="width:min(1100px,94vw);max-height:90vh;overflow:auto;font-size:16px" id="adminBox"></div></div>
 <div class="login" id="login"><div class="box"><b>교사 비밀번호</b><input type="password" id="pin" inputmode="numeric" autocomplete="off"><div style="display:flex;gap:8px"><button class="tool red" id="pinOk" style="flex:1">확인</button><button class="tool" id="pinCancel">닫기</button></div><div id="pinMsg" style="color:var(--stamp);margin-top:8px"></div></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="common.js?v=18"></script>
+<script src="common.js?v=19"></script>
 <script>
 let peek = false;   /* 1라운드 발견 위치·4라운드 득표를 칠판에 보일지 (기본: 가림) */
 let present = false, presSel = null; const presOpen = new Set();   /* 4라운드 투표 뒤 구간별 베스트 발표 */
@@ -144,7 +146,7 @@ function renderHeader() {
   $('title').textContent = STORY.title + ' · 수사 상황판';
   $('steps').className = 'steps' + (teacher() ? ' t' : '');
   $('steps').innerHTML = B.phases.map((p, i) => `<span class="${i === phase() ? 'on' : ''}" data-ph="${i}">${i + 1}. ${esc(p)}</span>`).join('');
-  $('prev').hidden = $('next').hidden = $('adminBtn').hidden = !teacher();
+  $('prev').hidden = $('next').hidden = $('adminBtn').hidden = $('rosterBtn').hidden = !teacher();
   $('peek').hidden = !(teacher() && (phase() === 1 || phase() === 4));
   $('peek').textContent = peek ? (phase() === 1 ? '👁 위치 보임' : '👁 득표 보임') : (phase() === 1 ? '🔒 위치 가림' : '🔒 득표 가림');
   $('peek').classList.toggle('red', peek);
@@ -246,7 +248,7 @@ function vPresent() {
       return `<div class="paper" style="padding:26px 32px">
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap"><div class="stamp" style="font-size:1em;transform:none;background:#fff">${W.win.length > 1 ? '공동 1등' : '베스트'}</div>
           <h2 style="margin:0;font-size:1.45em">${esc(sec.name)} · ${g}모둠</h2><span style="font-size:1.1em">👍 ${W.max}표</span></div>
-        ${(() => { const b = ((V.best || {})[sec.name] || { win: [] }).win.find(x => x.g === g); return b ? (b.copied ? `<p class="muted" style="margin:10px 0 0">예시 문장 활용 · 예시 문장과 ${b.sim}% 같아서 베스트 점수는 없어요.</p>` : `<p style="margin:10px 0 0;color:var(--ok);font-weight:700">명탐정 기자 점수 +${V.bestPts || 3}</p>`) : ''; })()}
+        ${(() => { const b = ((V.best || {})[sec.name] || { win: [] }).win.find(x => x.g === g); return b ? (b.copied ? `<p class="muted" style="margin:10px 0 0">예시 문장 활용 · 예시 문장과 ${b.sim}% 겹쳐서(80% 이상) 베스트 점수는 없어요.</p>` : `<p style="margin:10px 0 0;color:var(--ok);font-weight:700">명탐정 기자 점수 +${V.bestPts || 3}</p>`) : ''; })()}
         <p style="font-size:1.15em;margin:14px 0 18px">🎤 <b>${g}모둠</b>, 왜 이렇게 고쳤는지 읽어 주세요.</p>
         ${ch.map(c => { const r = ok(c.key);
           return `<div class="pchg">
@@ -332,14 +334,34 @@ function render() {
   if (phase() === 5 && D.result && !revealDone) runReveal();
 }
 
+/* ---------- 모둠 명단 (교사만) ---------- */
+function renderRoster() {
+  const R = D && D.roster;
+  if (!R) { $('rosterBox').innerHTML = `<p>${D && D.teacher && !('roster' in D) ? '서버를 새 버전으로 배포하면 명단이 보여요.' : '교사 로그인 후 볼 수 있어요.'}</p><button class="tool" id="rosterClose">닫기</button>`; return; }
+  const gs = Object.keys(R).map(Number);
+  const total = gs.reduce((a, g) => a + R[g].tablets, 0);
+  const people = gs.reduce((a, g) => a + Object.values(R[g].roles).reduce((b, l) => b + l.filter(n => n !== '(이름 없음)').length, 0), 0);
+  $('rosterBox').innerHTML = `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><h2 style="margin:0">모둠 명단 · ${esc(D.state.cls)}</h2>
+      <span class="muted">접속한 태블릿 ${total}대 · 이름 ${people}명 · 학생이 [수사 수첩 열기]를 누르면 바로 올라와요</span>
+      <button class="tool" id="rosterClose" style="margin-left:auto">닫기</button></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-top:14px">${gs.map(g => {
+      const roles = R[g].roles, n = Object.values(roles).reduce((b, l) => b + l.length, 0);
+      return `<div style="background:#fff;border:1.5px solid var(--rule);border-radius:12px;padding:12px 14px">
+        <div style="display:flex;align-items:baseline;gap:8px"><b style="font-size:1.3em">${g}모둠</b><span class="muted">태블릿 ${R[g].tablets}대 · ${n}명</span></div>
+        ${Object.keys(roles).map(r => `<div style="display:flex;gap:10px;padding:7px 0;border-top:1px solid #e6ece9"><span style="width:6.5em;flex:none;font-weight:700;color:${roleColor(B.roles, r)}">${esc(r)}</span><span>${roles[r].length ? roles[r].map(esc).join(', ') : '<span style="color:var(--stamp);font-weight:700">아직 없음</span>'}</span></div>`).join('')}
+      </div>`; }).join('')}</div>
+    <p class="muted" style="margin:12px 0 0">빨간 '아직 없음'은 그 역할로 들어온 태블릿이 없다는 뜻이에요. 참관 선생님은 명단에 나오지 않아요. 잘못 들어온 학생은 학생 화면 오른쪽 위 이름표를 두 번 눌러 다시 고르면 명단도 바로 바뀌어요.</p>`;
+}
+
 /* ---------- 반·기록 관리 ---------- */
 let A = null, aType = '', aGroup = 0, aHidden = false;
-const TYPE_NAME = { find: '결함 수사', hint: '힌트', help: '문장 도움', line: '고친 문장', rline: '문장 심사', review: '한 줄 평', vote: '투표' };
+const TYPE_NAME = { find: '결함 수사', hint: '힌트', help: '문장 도움', join: '접속', line: '고친 문장', rline: '문장 심사', review: '한 줄 평', vote: '투표' };
 function openAdmin() { $('admin').classList.add('show'); loadAdmin(); }
 function loadAdmin() { return call('admin', pin).then(a => { A = a; renderAdmin(); }).catch(err => { $('adminBox').innerHTML = esc(err); }); }
 function summary(e) {
   if (e.type === 'find') return `${e.card}${e.problem ? ' · ' + e.problem : ''} <span class="muted">(${e.result.split(':')[0] === 'full' ? '정답' : e.result.split(':')[0] === 'part' ? '문장만' : '기록'})</span>`;
   if (e.type === 'hint') return esc(e.problem);
+  if (e.type === 'join') return `${esc(e.role)} · ${esc(e.who || '')}`;
   if (e.type === 'help') return `${esc(e.target)} · ${e.card === '2' ? '② 예시 문장 (총 −2)' : '① 방향 (−1)'}`;
   if (e.type === 'rewrite') return `<b>${esc(e.target)}</b> ${esc(e.fix.slice(0, 80))}${e.fix.length > 80 ? '…' : ''}`;
   if (e.type === 'line') { const k = /^\d+-\d+$/.test(e.key) ? `${secName(e.key)} ${Number(e.key.split('-')[1]) + 1}번째` : esc(e.target) + ' 새 문장'; return e.card === 'del' ? `${k} · 문장 삭제 <span class="muted">(${esc(e.problem)})</span>` : `${k} · ${esc(e.fix.slice(0, 70))}${e.fix.length > 70 ? '…' : ''} <span class="muted">(이유: ${esc(e.problem)})</span>`; }
@@ -381,7 +403,7 @@ function poll(force) {
     const sig = JSON.stringify(d);
     if (D && (D.state.phase !== d.state.phase || D.state.cls !== d.state.cls)) { sel = null; cardSel = ''; peek = false; present = false; presSel = null; if (D.state.cls !== d.state.cls) revealDone = false; }
     const changed = sig !== lastSig; D = d; lastSig = sig;
-    if (force || changed) render();
+    if (force || changed) { render(); if ($('roster').classList.contains('show')) renderRoster(); }
   }).catch(err => { if (!D) $('wrap').innerHTML = `<div class="col" style="color:#fff">연결하지 못했어요: ${esc(err)}</div>`; });
 }
 
@@ -418,6 +440,8 @@ document.addEventListener('click', e => {
   if (t.id === 'plus') { fs = Math.min(40, fs + 2); store('case_fs', fs); render(); return; }
   if (t.id === 'minus') { fs = Math.max(14, fs - 2); store('case_fs', fs); render(); return; }
   if (t.id === 'adminBtn') return openAdmin();
+  if (t.id === 'rosterBtn') { $('roster').classList.add('show'); renderRoster(); return; }
+  if (t.id === 'rosterClose' || t.id === 'roster') { $('roster').classList.remove('show'); return; }
   if (t.id === 'adminClose') { $('admin').classList.remove('show'); return; }
   const cl = t.closest('[data-cls]'); if (cl) { if (cl.dataset.cls === A.cur) return; if (!confirm2(cl, cl.dataset.cls + ' 열기?')) return; revealDone = false; return adminAct(call('openClass', pin, cl.dataset.cls)); }
   if (t.id === 'addCls') { const v = $('newCls').value.trim(); if (v) adminAct(call('addClass', pin, v)); return; }
