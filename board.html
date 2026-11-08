@@ -60,6 +60,13 @@ header{display:flex;align-items:center;gap:14px;padding:10px 20px;color:#e8efec;
 .cm .m{font-size:.75em;color:var(--ink-soft);margin-bottom:3px;display:flex;gap:8px;align-items:center}
 .cm .hide{margin-left:auto;font-size:12px;border:1px solid var(--rule);background:#fff;border-radius:6px;padding:2px 8px;cursor:pointer}
 /* 복원·심사 */
+.pgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:12px}
+.pcard{background:var(--paper);border:2px solid transparent;border-radius:12px;padding:12px 10px;text-align:center;cursor:pointer;font:inherit;color:var(--ink);display:flex;flex-direction:column;gap:6px;align-items:center}
+.pcard b{font-size:1.05em}.pcard span{font-size:1.6em;font-weight:800;color:var(--stamp)}.pcard small{color:#777;font-size:.75em}
+.pcard.open span{font-size:.95em}.pcard.on{border-color:var(--stamp);box-shadow:0 0 0 3px rgba(178,34,34,.18)}
+.pchg{border-left:5px solid var(--ok);padding:10px 16px;margin:0 0 14px;background:#fbfaf6;border-radius:6px}
+.pchg .lab{font-size:.78em;color:#777;margin-top:6px}.pchg .orig{text-decoration:line-through;color:#8a8a8a;font-size:1.05em}
+.pchg .new{font-size:1.25em;font-weight:700;line-height:1.55}.pchg .why{font-size:1.15em;line-height:1.55}
 .vgrid{grid-template-columns:repeat(3,1fr)!important}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;width:100%;align-content:start}
 .orig{font-size:.72em;line-height:1.65;background:var(--paper-2);border-radius:8px;padding:10px 12px;color:var(--ink-soft)}
@@ -108,6 +115,7 @@ header{display:flex;align-items:center;gap:14px;padding:10px 20px;color:#e8efec;
   <button class="tool red" id="next" hidden>다음 단계 ▶</button>
   <button class="tool" id="minus">가-</button><button class="tool" id="plus">가+</button>
   <button class="tool" id="peek" hidden></button>
+  <button class="tool" id="present" hidden>🎤 베스트 발표</button>
   <button class="tool" id="adminBtn" hidden>반·기록 관리</button>
   <button class="tool" id="loginBtn">교사 로그인</button>
 </header>
@@ -116,9 +124,10 @@ header{display:flex;align-items:center;gap:14px;padding:10px 20px;color:#e8efec;
 <div class="login" id="login"><div class="box"><b>교사 비밀번호</b><input type="password" id="pin" inputmode="numeric" autocomplete="off"><div style="display:flex;gap:8px"><button class="tool red" id="pinOk" style="flex:1">확인</button><button class="tool" id="pinCancel">닫기</button></div><div id="pinMsg" style="color:var(--stamp);margin-top:8px"></div></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="common.js?v=15"></script>
+<script src="common.js?v=16"></script>
 <script>
 let peek = false;   /* 1라운드 발견 위치·4라운드 득표를 칠판에 보일지 (기본: 가림) */
+let present = false, presSel = null; const presOpen = new Set();   /* 4라운드 투표 뒤 구간별 베스트 발표 */
 let B = null, D = null, pin = sessionGet('case_pin') || '', sel = null, gtab = 1, cardSel = '', revealDone = false;
 let fs = Number(store('case_fs')) || 22;
 function sessionGet(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
@@ -139,6 +148,9 @@ function renderHeader() {
   $('peek').hidden = !(teacher() && (phase() === 1 || phase() === 4));
   $('peek').textContent = peek ? (phase() === 1 ? '👁 위치 보임' : '👁 득표 보임') : (phase() === 1 ? '🔒 위치 가림' : '🔒 득표 가림');
   $('peek').classList.toggle('red', peek);
+  $('present').hidden = !(teacher() && phase() === 4);
+  $('present').textContent = present ? '◀ 투표 화면' : '🎤 베스트 발표';
+  if (phase() === 4 && present) $('peek').hidden = true;
   $('code').innerHTML = esc(STORY.code) + (D.state.cls ? ` <span class="clsbadge">${esc(D.state.cls)} 진행 중</span>` : ' <span class="clsbadge" style="background:var(--gold);color:#fff">반을 열어 주세요</span>');
   $('loginBtn').textContent = teacher() ? '교사 모드' : '교사 로그인';
 }
@@ -210,8 +222,46 @@ function vReview() {
 }
 
 /* 4 베스트 투표: 구간별 실시간 집계 */
+/* 구간별 베스트 발표: 누르기 전에는 1등을 가리고, 누르면 원문·고친 문장·이유·득표를 크게 보여 줌 */
+function presWinners(sec, V) {
+  const t = sec.cands.map(c => ({ g: c.g, n: V.tally[sec.name + '|' + c.g] || 0 }));
+  const max = Math.max(0, ...t.map(x => x.n));
+  return { max, win: max ? t.filter(x => x.n === max).map(x => x.g) : [], all: t.sort((a, b) => b.n - a.n) };
+}
+function vPresent() {
+  const V = D.vote || { sections: [], tally: {}, voters: 0 };
+  const cards = V.sections.map(sec => {
+    const W = presWinners(sec, V), open = presOpen.has(sec.name), on = presSel === sec.name;
+    const sub = !sec.cands.length ? '고친 모둠 없음' : !W.max ? '투표 없음' : open ? `${W.win.map(g => g + '모둠').join(' · ')} · 👍 ${W.max}표${W.win.length > 1 ? ' · 공동 1등' : ''}` : '누르면 1등 공개';
+    return `<button data-ps="${esc(sec.name)}" class="pcard ${on ? 'on' : ''} ${open ? 'open' : ''}"><b>${esc(sec.name)}</b><span>${open || !W.max ? esc(sub) : '?'}</span>${open || !W.max ? '' : `<small>${esc(sub)}</small>`}</button>`;
+  }).join('');
+  let body = `<div class="paper" style="text-align:center;padding:40px"><h2 style="font-size:1.5em">구간을 하나씩 눌러 베스트 글을 공개하세요</h2><p class="muted">1등 모둠이 고친 문장과 바꾼 이유를 읽어 줍니다. 투표한 기기 ${V.voters}대</p></div>`;
+  const sec = V.sections.find(x => x.name === presSel);
+  if (sec) {
+    const W = presWinners(sec, V);
+    if (!W.max) body = `<div class="paper"><h2>${esc(sec.name)}</h2><p class="muted">${sec.cands.length ? '이 구간은 아직 투표가 없어요.' : '이 구간은 고친 모둠이 없어요.'}</p></div>`;
+    else body = W.win.map(g => {
+      const ch = (D.changes[g] || []).filter(c => c.sec === sec.name);
+      const ok = k => (D.rlines || []).find(r => r.target === g && r.key === k);
+      return `<div class="paper" style="padding:26px 32px">
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap"><div class="stamp" style="font-size:1em;transform:none;background:#fff">${W.win.length > 1 ? '공동 1등' : '베스트'}</div>
+          <h2 style="margin:0;font-size:1.45em">${esc(sec.name)} · ${g}모둠</h2><span style="font-size:1.1em">👍 ${W.max}표</span></div>
+        <p style="font-size:1.15em;margin:14px 0 18px">🎤 <b>${g}모둠</b>, 왜 이렇게 고쳤는지 읽어 주세요.</p>
+        ${ch.map(c => { const r = ok(c.key);
+          return `<div class="pchg">
+            ${c.added ? '<div class="lab">새로 넣은 문장</div>' : `<div class="lab">원래 문장</div><div class="orig">${esc(c.orig)}</div>`}
+            <div class="lab">고친 문장</div><div class="new">${c.del ? '(이 문장을 지웠어요)' : esc(c.text)}</div>
+            <div class="lab">바꾼 이유</div><div class="why">"${esc(c.reason || '')}"${c.who ? ` <span class="muted">· ${esc(c.role)} ${esc(c.who)}</span>` : ''}</div>
+            ${r ? `<div class="muted" style="margin-top:6px">상호 심사: ${r.verdict === 'ok' ? '👍 타당해요' : '🤔 아쉬워요'}${r.comment ? ' · ' + esc(r.comment) : ''}</div>` : ''}
+          </div>`; }).join('') || '<p class="muted">고친 문장 정보가 없어요.</p>'}
+      </div>`;
+    }).join('') + `<div class="paper"><div class="m">이 구간 득표</div>${W.all.map(x => `<span style="display:inline-block;margin:6px 16px 0 0;font-size:1.05em">${x.g}모둠 <b>${x.n}</b>표</span>`).join('')}${W.win.length > 1 ? '<p class="muted" style="margin:8px 0 0">공동 1등이면 두 모둠 모두 읽어요. 우리 반 보고서에는 상호 심사에서 \'타당해요\'를 더 받은 글이 실려요.</p>' : ''}</div>`;
+  }
+  return `<div class="col" style="flex:1"><div class="pgrid">${cards}</div>${body}</div>`;
+}
 function partsHTML(parts) { return parts.map(p => p.c ? `<span style="text-decoration:underline 3px var(--ok);text-underline-offset:5px">${esc(p.t)}</span>` : esc(p.t)).join(' '); }
 function vVote() {
+  if (present) return vPresent();
   const V = D.vote || { sections: [], tally: {}, voters: 0 };
   return `<div class="col grid vgrid">` + `<div class="paper" style="grid-column:1/-1;display:flex;align-items:center;gap:16px"><h2 style="margin:0">구간별 베스트 투표</h2><span class="muted" style="font-size:.8em">투표한 기기 ${V.voters}대 · ${peek ? '지금 칠판에 모둠 이름과 득표가 보여요' : '모둠 이름과 득표는 가려 두었어요 (결과 공개에서 확인)'}</span></div>` +
     V.sections.map(sec => {
@@ -327,7 +377,7 @@ let lastSig = '';
 function poll(force) {
   return call('board', pin).then(d => {
     const sig = JSON.stringify(d);
-    if (D && (D.state.phase !== d.state.phase || D.state.cls !== d.state.cls)) { sel = null; cardSel = ''; peek = false; if (D.state.cls !== d.state.cls) revealDone = false; }
+    if (D && (D.state.phase !== d.state.phase || D.state.cls !== d.state.cls)) { sel = null; cardSel = ''; peek = false; present = false; presSel = null; if (D.state.cls !== d.state.cls) revealDone = false; }
     const changed = sig !== lastSig; D = d; lastSig = sig;
     if (force || changed) render();
   }).catch(err => { if (!D) $('wrap').innerHTML = `<div class="col" style="color:#fff">연결하지 못했어요: ${esc(err)}</div>`; });
@@ -358,6 +408,8 @@ document.addEventListener('click', e => {
     }
     return go(Math.min(5, phase() + 1));
   }
+  if (t.id === 'present') { present = !present; presSel = null; render(); return; }
+  const ps = t.closest('[data-ps]'); if (ps) { presSel = ps.dataset.ps; presOpen.add(presSel); render(); return; }
   if (t.id === 'peek') { peek = !peek; sel = null; render(); return; }
   if (t.id === 'prev') return go(Math.max(0, phase() - 1));
   if (t.id === 'reveal') { revealDone = false; rtab = 'rank'; return go(5, true); }
