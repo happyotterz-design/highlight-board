@@ -21,8 +21,8 @@ html,body{height:100%}
 body{margin:0;background:var(--desk);color:var(--ink);font-family:var(--body);display:flex;flex-direction:column;font-size:var(--fs)}
 button{font-family:inherit}
 header{display:flex;align-items:center;gap:14px;padding:10px 20px;color:#e8efec;flex-wrap:wrap;border-bottom:1px solid #3b5158}
-.code{font-family:var(--mono);font-size:13px;color:#9fb5ad;letter-spacing:.08em}
-.title{font-family:var(--display);font-weight:800;font-size:24px}
+.code{font-family:var(--mono);font-size:13px;color:#9fb5ad;letter-spacing:.08em;display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.title{font-family:var(--display);font-weight:800;font-size:22px;white-space:nowrap}
 .steps{display:flex;gap:4px;flex-wrap:wrap}
 .steps span{font-size:14px;padding:5px 10px;border-radius:6px;background:var(--desk-2);color:#9fb5ad;cursor:default}
 .steps span.on{background:var(--gold);color:#fff;font-weight:700}
@@ -60,7 +60,8 @@ header{display:flex;align-items:center;gap:14px;padding:10px 20px;color:#e8efec;
 .cm .m{font-size:.75em;color:var(--ink-soft);margin-bottom:3px;display:flex;gap:8px;align-items:center}
 .cm .hide{margin-left:auto;font-size:12px;border:1px solid var(--rule);background:#fff;border-radius:6px;padding:2px 8px;cursor:pointer}
 /* 복원·심사 */
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:14px;width:100%;align-content:start}
+.vgrid{grid-template-columns:repeat(3,1fr)!important}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;width:100%;align-content:start}
 .orig{font-size:.72em;line-height:1.65;background:var(--paper-2);border-radius:8px;padding:10px 12px;color:var(--ink-soft)}
 .rw{font-size:.85em;line-height:1.7;background:#fff;border:2px solid var(--ok);border-radius:8px;padding:10px 14px;white-space:pre-wrap}
 .status{font-size:.65em;font-weight:700;color:var(--ok)}
@@ -81,7 +82,7 @@ header{display:flex;align-items:center;gap:14px;padding:10px 20px;color:#e8efec;
 .login input{width:100%;font-size:20px;padding:10px;border:2px solid var(--rule);border-radius:9px;margin:10px 0}
 .qr{background:#fff;padding:12px;border-radius:12px;display:inline-block}
 .url{font-family:var(--mono);font-size:.7em;word-break:break-all;margin-top:8px}
-.clsbadge{background:var(--paper);color:var(--ink);font-weight:700;border-radius:8px;padding:5px 12px;font-size:17px}
+.clsbadge{background:var(--paper);color:var(--ink);font-weight:700;border-radius:8px;padding:5px 12px;font-size:15px;letter-spacing:0}
 .cls{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
 .cls button{padding:14px 8px;border-radius:10px;border:2px solid var(--rule);background:#fff;font-size:18px;font-weight:700;cursor:pointer;line-height:1.3}
 .cls button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
@@ -106,6 +107,7 @@ header{display:flex;align-items:center;gap:14px;padding:10px 20px;color:#e8efec;
   <button class="tool" id="prev" hidden>◀ 이전</button>
   <button class="tool red" id="next" hidden>다음 단계 ▶</button>
   <button class="tool" id="minus">가-</button><button class="tool" id="plus">가+</button>
+  <button class="tool" id="peek" hidden></button>
   <button class="tool" id="adminBtn" hidden>반·기록 관리</button>
   <button class="tool" id="loginBtn">교사 로그인</button>
 </header>
@@ -114,8 +116,9 @@ header{display:flex;align-items:center;gap:14px;padding:10px 20px;color:#e8efec;
 <div class="login" id="login"><div class="box"><b>교사 비밀번호</b><input type="password" id="pin" inputmode="numeric" autocomplete="off"><div style="display:flex;gap:8px"><button class="tool red" id="pinOk" style="flex:1">확인</button><button class="tool" id="pinCancel">닫기</button></div><div id="pinMsg" style="color:var(--stamp);margin-top:8px"></div></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="common.js?v=11"></script>
+<script src="common.js?v=12"></script>
 <script>
+let peek = false;   /* 1라운드 발견 위치·4라운드 득표를 칠판에 보일지 (기본: 가림) */
 let B = null, D = null, pin = sessionGet('case_pin') || '', sel = null, gtab = 1, cardSel = '', revealDone = false;
 let fs = Number(store('case_fs')) || 22;
 function sessionGet(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
@@ -133,6 +136,9 @@ function renderHeader() {
   $('steps').className = 'steps' + (teacher() ? ' t' : '');
   $('steps').innerHTML = B.phases.map((p, i) => `<span class="${i === phase() ? 'on' : ''}" data-ph="${i}">${i + 1}. ${esc(p)}</span>`).join('');
   $('prev').hidden = $('next').hidden = $('adminBtn').hidden = !teacher();
+  $('peek').hidden = !(teacher() && (phase() === 1 || phase() === 4));
+  $('peek').textContent = peek ? (phase() === 1 ? '👁 위치 보임' : '👁 득표 보임') : (phase() === 1 ? '🔒 위치 가림' : '🔒 득표 가림');
+  $('peek').classList.toggle('red', peek);
   $('code').innerHTML = esc(STORY.code) + (D.state.cls ? ` <span class="clsbadge">${esc(D.state.cls)} 진행 중</span>` : ' <span class="clsbadge" style="background:var(--gold);color:#fff">반을 열어 주세요</span>');
   $('loginBtn').textContent = teacher() ? '교사 모드' : '교사 로그인';
 }
@@ -152,7 +158,7 @@ function vFind() {
   const foundKeys = {}; D.flawMap.filter(f => f.found).forEach(f => f.keys.forEach(k => (foundKeys[k] = foundKeys[k] || []).push(f)));
   const found = D.flawMap.filter(f => f.found).length;
   const text = B.sections.map((sec, si) => `<div class="sec"><div class="nm">${esc(sec.name)}</div><div class="txt">` + sec.sentences.map((s, j) => {
-    const k = si + '-' + j, arr = byKey[k] || [], fk = foundKeys[k] || [];
+    const k = si + '-' + j, arr = peek ? (byKey[k] || []) : [], fk = peek ? (foundKeys[k] || []) : [];
     const bg = arr.length ? `background:rgba(255,${Math.round(214 - 50 * arr.length / max)},0,${(0.15 + 0.6 * arr.length / max).toFixed(2)})` : '';
     return `<span class="s ${sel === k ? 'sel' : ''} ${fk.length ? 'found' : ''}" data-k="${k}" style="${bg}">${esc(s)}</span>${fk.map(f => `<span class="tag">${esc(f.card)}</span>`).join('')}${arr.length ? `<span class="cnt">${arr.length}</span>` : ''} `;
   }).join('') + `</div></div>`).join('');
@@ -167,7 +173,7 @@ function vFind() {
     side = `<div class="paper" style="text-align:center"><div class="muted" style="font-size:.7em">우리 반이 찾은 결함</div><div class="big">${found}<small> / ${D.flawMap.length}</small></div></div>
       <div class="paper"><h2>결함 목록</h2>${D.flawMap.map(f => `<div class="fl ${f.found ? 'on' : ''}"><span class="c">${f.found ? '발견' : '???'}</span><span>${esc(f.section)}</span><b style="margin-left:auto">${f.found ? (f.card ? esc(f.card) : '이름은 2라운드에 공개') : '· · ·'}</b>${f.found ? `<span class="muted">${f.groups}모둠</span>` : ''}</div>`).join('')}</div>
       <div class="paper"><h2>모둠별 수사 기록</h2>${Object.keys(D.progress).map(g => { const n = D.progress[g].finds; const m = Math.max(1, ...Object.values(D.progress).map(p => p.finds)); return `<div class="bar"><span style="width:60px">${g}모둠</span><span class="b" style="width:${Math.max(4, 260 * n / m)}px"></span><span>${n}</span></div>`; }).join('')}
-      <p class="muted">문장을 누르면 그 문장에 달린 의견을 볼 수 있어요.</p></div>`;
+      <p class="muted">${peek ? '문장을 누르면 그 문장에 달린 의견을 볼 수 있어요.' : '발견 위치는 가려 두었어요. 수사가 끝나면 위 [🔒 발견 위치 가림]을 눌러 함께 보세요.'}</p></div>`;
   }
   return `<div class="col paper" style="flex:1.5;margin:0">${text}</div><div class="col" style="flex:1">${side}</div>`;
 }
@@ -207,12 +213,13 @@ function vReview() {
 function partsHTML(parts) { return parts.map(p => p.c ? `<span style="text-decoration:underline 3px var(--ok);text-underline-offset:5px">${esc(p.t)}</span>` : esc(p.t)).join(' '); }
 function vVote() {
   const V = D.vote || { sections: [], tally: {}, voters: 0 };
-  return `<div class="col grid">` + `<div class="paper" style="grid-column:1/-1;display:flex;align-items:center;gap:16px"><h2 style="margin:0">구간별 베스트 투표</h2><span class="muted" style="font-size:.8em">투표한 기기 ${V.voters}대 · 학생 화면에는 모둠 이름 없이 1안·2안으로 섞여 보여요</span></div>` +
+  return `<div class="col grid vgrid">` + `<div class="paper" style="grid-column:1/-1;display:flex;align-items:center;gap:16px"><h2 style="margin:0">구간별 베스트 투표</h2><span class="muted" style="font-size:.8em">투표한 기기 ${V.voters}대 · ${peek ? '지금 칠판에 모둠 이름과 득표가 보여요' : '모둠 이름과 득표는 가려 두었어요 (결과 공개에서 확인)'}</span></div>` +
     V.sections.map(sec => {
       if (!sec.cands.length) return `<div class="paper"><h2>${esc(sec.name)}</h2><p class="muted">고친 모둠이 없어요 (원문 사용)</p></div>`;
       const max = Math.max(1, ...sec.cands.map(c => V.tally[sec.name + '|' + c.g] || 0));
       return `<div class="paper"><h2>${esc(sec.name)}</h2>` + shuffleFor(sec.cands, (D.state.cls || '') + '|' + sec.name).map((c, i) => { const n = V.tally[sec.name + '|' + c.g] || 0;
-        return `<div class="cm ${n === max && n ? 'full' : ''}"><div class="m"><b>${i + 1}안</b> <span class="muted">(${c.g}모둠)</span> · 👍 ${n}표 <span style="display:inline-block;height:10px;border-radius:5px;background:var(--stamp);width:${120 * n / max}px;margin-left:6px"></span></div>${partsHTML(c.parts)}</div>`; }).join('') + `</div>`;
+        if (!peek) return `<div class="cm"><div class="m" style="white-space:nowrap"><b>${i + 1}안</b></div>${partsHTML(c.parts)}</div>`;
+        return `<div class="cm ${n === max && n ? 'full' : ''}"><div class="m" style="white-space:nowrap"><b>${i + 1}안</b> <span class="muted">(${c.g}모둠)</span> · 👍 ${n}표 <span style="display:inline-block;height:10px;border-radius:5px;background:var(--stamp);width:${80 * n / max}px;margin-left:6px"></span></div>${partsHTML(c.parts)}</div>`; }).join('') + `</div>`;
     }).join('') + `</div>`;
 }
 
@@ -269,14 +276,17 @@ function render() {
 
 /* ---------- 반·기록 관리 ---------- */
 let A = null, aType = '', aGroup = 0, aHidden = false;
-const TYPE_NAME = { find: '결함 수사', hint: '힌트', rewrite: '복원 글', review: '심사', self: '내 초안' };
+const TYPE_NAME = { find: '결함 수사', hint: '힌트', line: '고친 문장', rline: '문장 심사', review: '한 줄 평', vote: '투표' };
 function openAdmin() { $('admin').classList.add('show'); loadAdmin(); }
 function loadAdmin() { return call('admin', pin).then(a => { A = a; renderAdmin(); }).catch(err => { $('adminBox').innerHTML = esc(err); }); }
 function summary(e) {
   if (e.type === 'find') return `${e.card}${e.problem ? ' · ' + e.problem : ''} <span class="muted">(${e.result.split(':')[0] === 'full' ? '정답' : e.result.split(':')[0] === 'part' ? '문장만' : '기록'})</span>`;
   if (e.type === 'hint') return esc(e.problem);
   if (e.type === 'rewrite') return `<b>${esc(e.target)}</b> ${esc(e.fix.slice(0, 80))}${e.fix.length > 80 ? '…' : ''}`;
-  if (e.type === 'review') return `${esc(e.target)}모둠 심사 · 체크 ${String(e.card).split(',').filter(Boolean).length}개 · ${esc(e.problem)}`;
+  if (e.type === 'line') { const k = /^\d+-\d+$/.test(e.key) ? `${secName(e.key)} ${Number(e.key.split('-')[1]) + 1}번째` : esc(e.target) + ' 새 문장'; return e.card === 'del' ? `${k} · 문장 삭제 <span class="muted">(${esc(e.problem)})</span>` : `${k} · ${esc(e.fix.slice(0, 70))}${e.fix.length > 70 ? '…' : ''} <span class="muted">(이유: ${esc(e.problem)})</span>`; }
+  if (e.type === 'rline') return `${esc(e.target)}모둠 ${/^\d+-\d+$/.test(e.key) ? esc(secName(e.key)) : '새 문장'} · ${e.card === 'ok' ? '👍 타당해요' : '🤔 아쉬워요'}${e.problem ? ' · ' + esc(e.problem) : ''}`;
+  if (e.type === 'vote') return `${esc(e.target)} · ${esc(e.card)}모둠 글에 투표`;
+  if (e.type === 'review') return `${esc(e.target)}모둠에게 · ${esc(e.problem)}`;
   if (e.type === 'self') return `${esc(e.card)} · ${esc(e.problem)} → ${esc(e.fix)}`;
   return '';
 }
@@ -295,7 +305,7 @@ function renderAdmin() {
       <select id="aType"><option value="">모든 종류</option>${Object.keys(TYPE_NAME).map(k => `<option value="${k}" ${aType === k ? 'selected' : ''}>${TYPE_NAME[k]}</option>`).join('')}</select>
       <select id="aGroup"><option value="0">모든 모둠</option>${Array.from({ length: groups }, (_, i) => `<option value="${i + 1}" ${aGroup === i + 1 ? 'selected' : ''}>${i + 1}모둠</option>`).join('')}</select>
       <label style="font-size:14px"><input type="checkbox" id="aHidden" ${aHidden ? 'checked' : ''}> 지운 것도 보기</label></div>
-    <table><tr><th>시각</th><th>모둠</th><th>종류</th><th>내용</th><th></th></tr>${rec.map(e => `<tr class="${e.hidden ? 'hid' : ''}"><td>${e.time ? new Date(e.time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''}</td><td>${e.group}모둠<br><span class="muted">${esc(e.role)}</span></td><td>${TYPE_NAME[e.type] || esc(e.type)}</td><td>${summary(e)}</td>
+    <table><tr><th>시각</th><th>모둠</th><th>종류</th><th>내용</th><th></th></tr>${rec.map(e => `<tr class="${e.hidden ? 'hid' : ''}"><td>${e.time ? new Date(e.time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''}</td><td>${e.group}모둠<br><span class="muted">${esc(e.role)}${e.who ? ' · ' + esc(e.who) : ''}</span></td><td>${TYPE_NAME[e.type] || esc(e.type)}</td><td>${summary(e)}</td>
       <td>${e.hidden ? `<button class="sbtn" data-unhide="${esc(e.id)}">되살리기</button>` : `<button class="sbtn" data-del="${esc(e.id)}">지우기</button>`}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">기록이 없어요.</td></tr>'}</table>` : '<p class="muted">위에서 반을 먼저 열어 주세요.</p>'}</div>`;
 }
 function adminAct(p) { return p.then(() => Promise.all([loadAdmin(), poll(true)])).catch(err => alertBar(err)); }
@@ -310,7 +320,7 @@ let lastSig = '';
 function poll(force) {
   return call('board', pin).then(d => {
     const sig = JSON.stringify(d);
-    if (D && (D.state.phase !== d.state.phase || D.state.cls !== d.state.cls)) { sel = null; cardSel = ''; if (D.state.cls !== d.state.cls) revealDone = false; }
+    if (D && (D.state.phase !== d.state.phase || D.state.cls !== d.state.cls)) { sel = null; cardSel = ''; peek = false; if (D.state.cls !== d.state.cls) revealDone = false; }
     const changed = sig !== lastSig; D = d; lastSig = sig;
     if (force || changed) render();
   }).catch(err => { if (!D) $('wrap').innerHTML = `<div class="col" style="color:#fff">연결하지 못했어요: ${esc(err)}</div>`; });
@@ -324,7 +334,7 @@ function alertBar(t) { $('timer').textContent = String(t).slice(0, 30); }
 
 document.addEventListener('click', e => {
   const t = e.target;
-  const k = t.closest('[data-k]'); if (k && phase() === 1) { sel = sel === k.dataset.k ? null : k.dataset.k; render(); return; }
+  const k = t.closest('[data-k]'); if (k && phase() === 1 && peek) { sel = sel === k.dataset.k ? null : k.dataset.k; render(); return; }
   const h = t.closest('[data-hide]'); if (h) { h.disabled = true; call('toggleHide', pin, h.dataset.hide).then(() => poll(true)); return; }
   const rtb = t.closest('[data-rt]'); if (rtb) { rtab = rtb.dataset.rt; render(); return; }
   const gt = t.closest('[data-gt]'); if (gt) { gtab = Number(gt.dataset.gt); render(); return; }
@@ -341,6 +351,7 @@ document.addEventListener('click', e => {
     }
     return go(Math.min(5, phase() + 1));
   }
+  if (t.id === 'peek') { peek = !peek; sel = null; render(); return; }
   if (t.id === 'prev') return go(Math.max(0, phase() - 1));
   if (t.id === 'reveal') { revealDone = false; rtab = 'rank'; return go(5, true); }
   if (t.id === 'plus') { fs = Math.min(40, fs + 2); store('case_fs', fs); render(); return; }
