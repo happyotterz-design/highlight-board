@@ -164,7 +164,7 @@ textarea{resize:vertical;min-height:58px}
 <div class="sheet" id="sheet"><div class="inner" id="sheetInner"></div></div>
 <div class="verdict" id="verdict"><div class="vbox" id="vbox"></div></div>
 
-<script src="common.js?v=17"></script>
+<script src="common.js?v=18"></script>
 <script>
 let B = null;              // boot: 글, 카드, 단서, 구역
 let S = null;              // 우리 모둠 상태
@@ -203,8 +203,10 @@ function renderPick() {
     <h3>역할</h3><div class="pickgrid">${B.roles.map(r => `<button class="big ${me.role === r ? 'on' : ''}" data-pr="${esc(r)}">${esc(r)}</button>`).join('')}</div>
     <h3>이 태블릿을 쓰는 사람 이름</h3><input type="text" id="whoInput" maxlength="60" value="${esc(me.who || '')}" placeholder="한 명이면 이름만, 여러 명이면 쉼표로 (예: 김민지, 이서연)">
     <p class="muted" style="margin:4px 0 0">같은 역할을 두 명이 같이 맡으면 두 이름을 다 쓰세요.</p>
-    <div style="margin-top:14px;padding:10px 12px;border:1.5px dashed var(--rule);border-radius:10px"><b>참관 선생님</b> <span class="muted">· 보고 싶은 모둠을 고른 뒤 눌러 주세요. 제출·투표는 되지 않고 화면만 함께 넘어가요.</span><div style="margin-top:8px"><button class="big ${viewer() ? 'on' : ''}" data-pr="${VIEW}" style="width:100%">참관으로 보기</button></div></div>
-    <button class="go" id="register" ${me.group && me.role ? '' : 'disabled'}>수사 수첩 열기</button></div>`;
+    <button class="go" id="register" ${me.group && me.role && !viewer() ? '' : 'disabled'}>수사 수첩 열기</button></div>
+    <div class="paper" style="margin-top:28px;border:2px dashed #9aa8a3;box-shadow:none;background:#e3e8e6"><b>참관 선생님용</b> <span style="color:var(--stamp);font-weight:700">(학생은 누르지 마세요)</span>
+      <p class="muted" style="margin:6px 0 0">위에서 보고 싶은 모둠 번호만 고르고 아래 버튼을 눌러 주세요. 제출·투표는 되지 않고 화면만 함께 넘어가요.</p>
+      <div style="margin-top:8px"><button class="btn ghost" id="viewEnter" style="width:100%">참관으로 들어가기 (학생은 누르지 마세요)</button></div><div class="msg" id="viewMsg"></div></div>`;
 }
 
 /* ---------- 0 브리핑 ---------- */
@@ -580,6 +582,7 @@ document.addEventListener('click', e => {
   const t = e.target;
   const pg = t.closest('[data-pg]'); if (pg) { me.group = Number(pg.dataset.pg); return renderPick(); }
   const pr = t.closest('[data-pr]'); if (pr) { me.role = pr.dataset.pr; return renderPick(); }
+  if (t.id === 'viewEnter') { if (!me.group) return setMsg('viewMsg', '먼저 위에서 보고 싶은 모둠 번호를 눌러 주세요.', true); me.role = VIEW; me.who = '참관'; picking = false; store('case_me', me); S = null; lastSig = ''; render(); return poll(true); }
   if (t.id === 'register') { me.who = ($('whoInput').value || '').trim(); if (viewer() && !me.who) me.who = '참관'; if (!me.who) { $('whoInput').focus(); $('whoInput').placeholder = '이름을 꼭 써 주세요'; return; } picking = false; store('case_me', me); S = null; lastSig = ''; render(); return poll(true); }
   if (t.id === 'change') { if (confirm2(t, '다시 누르면 모둠·역할을 바꿔요')) { picking = true; render(); } return; }
   const tb = t.closest('[data-tab]'); if (tb) { tab = tb.dataset.tab; render(); return; }
