@@ -69,7 +69,7 @@ function setupGame() {
     ['역할 (쉼표로 구분)', '팩트체크,윤리·공정,현실·실행,환경·미래'],
     ['교사 비밀번호', '1234'],
     ['힌트 감점', 1],
-    ['반 목록 (쉼표로 구분)', '2-1반,2-2반,2-3반,2-4반,2-5반,2-6반']
+    ['반 목록 (쉼표로 구분)', '2-2(B-연구),2-2(D-일반),test']
   ], [160, 420]);
 
   // 문장번호: "구간순서-문장순서" (0부터). 본문을 고치면 여기 번호도 맞춰야 함.
@@ -144,7 +144,7 @@ function setupGame() {
   if (String(lg.getRange(1, 14).getValue()) !== '반') lg.getRange(1, 14).setValue('반').setFontWeight('bold');   // 예전 기록 탭에 '반' 칸 추가
   if (String(lg.getRange(1, 15).getValue()) !== '이름') lg.getRange(1, 15).setValue('이름').setFontWeight('bold');
   const cf = sheet_(SH.CONF);
-  if (!cf.getDataRange().getValues().some(r => String(r[0]).trim() === '반 목록 (쉼표로 구분)')) cf.appendRow(['반 목록 (쉼표로 구분)', '2-1반,2-2반,2-3반,2-4반,2-5반,2-6반']);
+  if (!cf.getDataRange().getValues().some(r => String(r[0]).trim() === '반 목록 (쉼표로 구분)')) cf.appendRow(['반 목록 (쉼표로 구분)', '2-2(B-연구),2-2(D-일반),test']);
   bustAll_();
 }
 
@@ -214,7 +214,7 @@ function conf0_() {
     roles: String(c['역할 (쉼표로 구분)'] || '').split(',').map(s => s.trim()).filter(Boolean),
     pin: String(c['교사 비밀번호'] || ''),
     hintCost: Number(c['힌트 감점'] || 1),
-    classes: keyStr_(c['반 목록 (쉼표로 구분)'] || '2-1반,2-2반,2-3반,2-4반,2-5반,2-6반').split(',').map(s => s.trim()).filter(Boolean)
+    classes: keyStr_(c['반 목록 (쉼표로 구분)'] || '2-2(B-연구),2-2(D-일반),test').split(',').map(s => s.trim()).filter(Boolean)
   };
 }
 
@@ -734,7 +734,7 @@ function admin(pin) {
     key: keyStr_(r[5] == null ? '' : r[5]).trim(), who: String(r[14] == null ? '' : r[14])
   }));
   const names = conf.classes.slice();
-  raw.forEach(e => { if (e.cls && names.indexOf(e.cls) < 0) names.push(e.cls); });
+  raw.forEach(e => { if (e.cls && !e.hidden && names.indexOf(e.cls) < 0) names.push(e.cls); });   // 목록에 없는 반은 남은 기록이 있을 때만 보임
   return {
     cur,
     classes: names.map(n => ({ name: n, count: raw.filter(e => e.cls === n && !e.hidden).length, phase: (all.by[n] || {}).phase || 0 })),
