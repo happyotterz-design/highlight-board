@@ -157,7 +157,7 @@ textarea{resize:vertical;min-height:58px}
 <div class="sheet" id="sheet"><div class="inner" id="sheetInner"></div></div>
 <div class="verdict" id="verdict"><div class="vbox" id="vbox"></div></div>
 
-<script src="common.js?v=12"></script>
+<script src="common.js?v=13"></script>
 <script>
 let B = null;              // boot: 글, 카드, 단서, 구역
 let S = null;              // 우리 모둠 상태
@@ -166,6 +166,14 @@ let picking = false;
 let tab = 'report', picked = new Set(), card = '', busy = false, editing = false;
        // 복원 글 임시 저장
 
+/* 참관 모드: 기록을 남기지 않고 화면만 따라감 */
+const VIEW = '참관';
+function viewer() { return me.role === VIEW; }
+const callServer = call;
+call = function (fn, ...args) {
+  if (viewer() && fn !== 'boot' && fn !== 'state') return Promise.reject('참관 모드에서는 저장되지 않아요. 화면만 볼 수 있어요.');
+  return callServer(fn, ...args);
+};
 function who(extra) { return Object.assign({ group: me.group, role: me.role, who: me.who || '' }, extra || {}); }
 function phase() { return S ? S.state.phase : (B ? B.state.phase : 0); }
 function sentence(k) { const [a, b] = k.split('-').map(Number); return B.sections[a] ? B.sections[a].sentences[b] : ''; }
@@ -176,7 +184,7 @@ function renderTop() {
   $('code').textContent = STORY.code;
   $('title').textContent = STORY.title;
   const cls = S && S.state.cls ? `<span class="badge" style="background:var(--gold)">${esc(S.state.cls)}</span>` : '';
-  $('me').innerHTML = cls + (me.group ? `<button class="badge" id="change">${me.group}모둠 · ${esc(me.role)}${me.who ? ' · ' + esc(me.who) : ''}</button>` : '');
+  $('me').innerHTML = cls + (me.group ? `<button class="badge" id="change" ${viewer() ? 'style="background:#6b4fa0"' : ''}>${me.group}모둠 · ${esc(me.role)}${me.who && !viewer() ? ' · ' + esc(me.who) : ''}</button>` : '');
   $('steps').innerHTML = B.phases.map((p, i) => `<span class="${i === phase() ? 'on' : i < phase() ? 'done' : ''}">${esc(p)}</span>`).join('');
 }
 
@@ -188,11 +196,13 @@ function renderPick() {
     <h3>역할</h3><div class="pickgrid">${B.roles.map(r => `<button class="big ${me.role === r ? 'on' : ''}" data-pr="${esc(r)}">${esc(r)}</button>`).join('')}</div>
     <h3>이 태블릿을 쓰는 사람 이름</h3><input type="text" id="whoInput" maxlength="60" value="${esc(me.who || '')}" placeholder="한 명이면 이름만, 여러 명이면 쉼표로 (예: 김민지, 이서연)">
     <p class="muted" style="margin:4px 0 0">같은 역할을 두 명이 같이 맡으면 두 이름을 다 쓰세요.</p>
+    <div style="margin-top:14px;padding:10px 12px;border:1.5px dashed var(--rule);border-radius:10px"><b>참관 선생님</b> <span class="muted">· 보고 싶은 모둠을 고른 뒤 눌러 주세요. 제출·투표는 되지 않고 화면만 함께 넘어가요.</span><div style="margin-top:8px"><button class="big ${viewer() ? 'on' : ''}" data-pr="${VIEW}" style="width:100%">참관으로 보기</button></div></div>
     <button class="go" id="register" ${me.group && me.role ? '' : 'disabled'}>수사 수첩 열기</button></div>`;
 }
 
 /* ---------- 0 브리핑 ---------- */
 function clueHTML() {
+  if (viewer()) return B.roles.map(r => `<div class="clue" style="margin-bottom:8px"><div class="k">${esc(r)} 수사관의 단서</div><div class="t">${esc(B.clues[r] || '')}</div></div>`).join('');
   return `<div class="clue"><div class="k">TOP SECRET · ${esc(me.role)} 수사관에게만</div><div class="t">${esc(B.clues[me.role] || '')}</div></div>`;
 }
 function renderBrief() {
@@ -544,7 +554,7 @@ document.addEventListener('click', e => {
   const t = e.target;
   const pg = t.closest('[data-pg]'); if (pg) { me.group = Number(pg.dataset.pg); return renderPick(); }
   const pr = t.closest('[data-pr]'); if (pr) { me.role = pr.dataset.pr; return renderPick(); }
-  if (t.id === 'register') { me.who = ($('whoInput').value || '').trim(); if (!me.who) { $('whoInput').focus(); $('whoInput').placeholder = '이름을 꼭 써 주세요'; return; } picking = false; store('case_me', me); S = null; lastSig = ''; render(); return poll(true); }
+  if (t.id === 'register') { me.who = ($('whoInput').value || '').trim(); if (viewer() && !me.who) me.who = '참관'; if (!me.who) { $('whoInput').focus(); $('whoInput').placeholder = '이름을 꼭 써 주세요'; return; } picking = false; store('case_me', me); S = null; lastSig = ''; render(); return poll(true); }
   if (t.id === 'change') { if (confirm2(t, '다시 누르면 모둠·역할을 바꿔요')) { picking = true; render(); } return; }
   const tb = t.closest('[data-tab]'); if (tb) { tab = tb.dataset.tab; render(); return; }
   const s = t.closest('.s'); if (s && phase() === 1) { const k = s.dataset.k; picked.has(k) ? picked.delete(k) : picked.add(k); editing = !!($('problem')?.value); render(); return; }
@@ -629,7 +639,7 @@ function start() {
   call('boot').then(b => {
     B = b;
     if (me.group > B.groups) me.group = null;
-    if (me.role && B.roles.indexOf(me.role) < 0) me.role = null;
+    if (me.role && me.role !== VIEW && B.roles.indexOf(me.role) < 0) me.role = null;
     render(); return poll(true);
   }).catch(err => { $('main').innerHTML = `<div class="paper"><h2>연결하지 못했어요</h2><p class="muted">${esc(err)}</p><button class="go" onclick="location.reload()">다시 시도</button></div>`; });
 }
