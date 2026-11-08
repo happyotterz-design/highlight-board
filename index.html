@@ -160,7 +160,7 @@ textarea{resize:vertical;min-height:58px}
 <div class="sheet" id="sheet"><div class="inner" id="sheetInner"></div></div>
 <div class="verdict" id="verdict"><div class="vbox" id="vbox"></div></div>
 
-<script src="common.js?v=14"></script>
+<script src="common.js?v=15"></script>
 <script>
 let B = null;              // boot: 글, 카드, 단서, 구역
 let S = null;              // 우리 모둠 상태
@@ -513,6 +513,7 @@ function renderResult() {
     <div class="paper"><h2>우리 반이 함께 완성한 보고서</h2><p class="muted">구간마다 투표 1등 글을 모았어요. 모범 답안과 비교한 완성도: <b style="color:var(--stamp);font-size:18px">${R.overall}%</b> (원문 ${R.overallBefore}%)</p>
       ${R.restored.map(s => `<h3>${esc(s.name)} ${s.by ? `<span class="ok">· ${s.by}모둠 · 👍 ${s.votes}표</span>` : '<span class="muted">· 원문</span>'} ${s.done ? `<span class="muted">· 완성도 ${s.done.pct}%</span>` : ''}</h3><div class="rw">${partsHTML(s.parts)}</div>`).join('')}</div>
     <div class="paper"><h2>오늘 우리가 잡은 결함</h2>${R.caught.map(f => `<div class="rec ${f.groups ? 'full' : 'part'}"><div class="m">${esc(f.section)} · <b>${esc(f.card)}</b> · ${f.groups ? f.groups + '개 모둠이 찾음' : '아무도 못 찾음'}</div>${esc(f.note)}</div>`).join('')}</div>
+    ${(() => { const C = caseClosed(R, S.state.cls); return `<div class="paper"><div class="m" style="color:var(--stamp);font-weight:700;border-bottom:3px double var(--ink);padding-bottom:6px">${esc(C.kicker)}</div><h2 style="line-height:1.4;margin-top:10px">${esc(C.headline)}</h2>${C.body.map(p => `<p style="font-size:15.5px;line-height:1.75;margin:0 0 8px">${esc(p)}</p>`).join('')}<p style="margin-top:10px"><b>${esc(C.credit)}</b></p></div>`; })()}
     <div class="paper"><h2>다음 시간 안내</h2>${NEXT_NOTICE.map(p => `<p style="font-size:16px;line-height:1.7;margin:0 0 8px">${esc(p)}</p>`).join('')}</div>`;
 }
 const NEXT_NOTICE = [

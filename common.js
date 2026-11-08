@@ -45,3 +45,22 @@ function shuffleFor(arr, seed) {
   for (let i = a.length - 1; i > 0; i--) { h = (Math.imul(h, 1103515245) + 12345) >>> 0; const j = h % (i + 1); [a[i], a[j]] = [a[j], a[i]]; }
   return a;
 }
+
+/* 결말: 브리핑의 익명 제보와 이어지는 사건 종결 기사 */
+function caseClosed(R, cls) {
+  const total = R.caught.length, found = R.caught.filter(f => f.groups).length;
+  const top = R.rank[0];
+  const end = R.restored.find(s => s.name === '결론');
+  const changed = R.restored.filter(s => s.by).length;
+  return {
+    kicker: '까칠한 기자단 · 사건 종결 보도',
+    headline: `[단독] ${cls ? cls + ' ' : ''}기자단, '수상한 보고서' 결함 ${found === total ? total + '개 모두' : found + '개'} 밝혀내`,
+    body: [
+      `익명 제보로 시작된 수사가 끝났다. 국립공원위원회 제출을 하루 앞둔 「오색 케이블카 검토 보고서」에서 기자단은 ${found === total ? `숨은 결함 ${total}개를 모두` : `숨은 결함 ${total}개 가운데 ${found}개를`} 찾아냈다.`,
+      `수사팀은 결함을 하나씩 고쳐 보고서를 복원했고, 서로의 수정을 심사한 뒤 구간마다 가장 설득력 있는 글을 골라 '우리 반 보고서'를 완성했다. ${changed}개 구간이 새로 쓰였고, 모범 답안과 비교한 완성도는 ${R.overallBefore}%에서 ${R.overall}%로 올랐다.`,
+      end && end.by ? `복원된 보고서는 이렇게 끝난다. "${end.text}"` : '',
+      '수정된 보고서는 내일 오전 국립공원위원회에 다시 제출된다. 위원회가 잘못된 판단을 내릴 뻔한 위기는 기자단의 손에서 막혔다.'
+    ].filter(Boolean),
+    credit: top ? `최우수 수사팀 ${top.group}모둠 (${top.grade})` : ''
+  };
+}
