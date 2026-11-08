@@ -116,7 +116,7 @@ header{display:flex;align-items:center;gap:14px;padding:10px 20px;color:#e8efec;
 <div class="login" id="login"><div class="box"><b>교사 비밀번호</b><input type="password" id="pin" inputmode="numeric" autocomplete="off"><div style="display:flex;gap:8px"><button class="tool red" id="pinOk" style="flex:1">확인</button><button class="tool" id="pinCancel">닫기</button></div><div id="pinMsg" style="color:var(--stamp);margin-top:8px"></div></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="common.js?v=13"></script>
+<script src="common.js?v=14"></script>
 <script>
 let peek = false;   /* 1라운드 발견 위치·4라운드 득표를 칠판에 보일지 (기본: 가림) */
 let B = null, D = null, pin = sessionGet('case_pin') || '', sel = null, gtab = 1, cardSel = '', revealDone = false;

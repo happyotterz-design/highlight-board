@@ -126,6 +126,9 @@ textarea{resize:vertical;min-height:58px}
 .vcand.on{border-color:var(--stamp);background:#fff3f1}
 .vcand.own{opacity:.55;cursor:default;background:var(--paper-2)}
 .vcand .vt{font-size:16.5px;line-height:1.75;margin-top:4px}
+.who{display:block;margin:4px 0 12px;padding:8px 12px;border-radius:8px;font-size:14px;line-height:1.55;color:var(--ink)}
+.who.g{background:#e3efe9;border-left:5px solid var(--ok)}
+.who.p{background:#efe9f7;border-left:5px solid #6b4fa0}
 .chg{text-decoration:underline 2px var(--ok);text-underline-offset:4px}
 .reldata{margin-top:10px;padding:10px;border-radius:10px;background:var(--ok-bg)}
 .stepbox{border:2px solid var(--ink);border-radius:12px;padding:12px;background:#fff}
@@ -157,7 +160,7 @@ textarea{resize:vertical;min-height:58px}
 <div class="sheet" id="sheet"><div class="inner" id="sheetInner"></div></div>
 <div class="verdict" id="verdict"><div class="vbox" id="vbox"></div></div>
 
-<script src="common.js?v=13"></script>
+<script src="common.js?v=14"></script>
 <script>
 let B = null;              // boot: 글, 카드, 단서, 구역
 let S = null;              // 우리 모둠 상태
@@ -225,7 +228,7 @@ function renderFind() {
   let body = '';
   if (tab === 'report') {
     const fk = foundByKey();
-    body = `<div class="paper"><p class="muted" style="margin-top:0">결함이 있다고 생각하는 문장을 누르고, 어떤 결함인지 카드로 고르세요. 이번 라운드는 <b>찾기만</b> 합니다. 고쳐 쓰기는 2라운드에서 해요.</p>` +
+    body = `<div class="paper"><div class="who g"><b>👥 모둠 공동</b> · 결함 점수와 '기회 2번'은 모둠이 함께 써요. 제출 전에 모둠과 상의하세요. 힌트를 쓰면 모둠 점수에서 빠져요.</div><p class="muted" style="margin-top:0">결함이 있다고 생각하는 문장을 누르고, 어떤 결함인지 카드로 고르세요. 이번 라운드는 <b>찾기만</b> 합니다. 고쳐 쓰기는 2라운드에서 해요.</p>` +
       B.sections.map((sec, si) => `<div class="sec"><div class="nm">${esc(sec.name)}</div><div class="txt">` +
         sec.sentences.map((s, j) => {
           const k = si + '-' + j, fs = fk[k] || [];
@@ -290,6 +293,8 @@ function showVerdict(r) {
 let curKey = null, rwMode = null;
 let lineDraft = store('case_lines') || {};
 function saveDrafts() { store('case_lines', lineDraft); }
+let TMP = store('case_tmp') || {};   // 심사 한마디·한 줄 평 입력 중인 글 (새로고침해도 유지)
+function saveTmp() { store('case_tmp', TMP); }
 function secIndex(name) { return B.sections.findIndex(x => x.name === name); }
 function newKey() { return 'n:' + Math.random().toString(36).slice(2, 8); }
 function flagMap() { const m = {}; (S.allFlaws || []).forEach(f => f.keys.forEach(k => (m[k] = m[k] || []).push(f))); return m; }
@@ -336,7 +341,7 @@ function renderRewrite() {
   const savedN = list.filter(i => i.saved).length;
   const modeBtn = (m, label, n) => `<button class="card ${rwMode === m ? 'on' : ''}" data-mode="${m}">${label} ${n}</button>`;
   const fmC = it2 => it2.added || (fm[it2.key] || []).some(f => f.role === me.role);
-  $('main').innerHTML = `<div class="paper"><h2>보고서 복원 · 글 전체</h2>
+  $('main').innerHTML = `<div class="paper"><h2>보고서 복원 · 글 전체</h2><div class="who g"><b>👤 내 담당 문장은 내가 · 👥 저장은 모둠 공동</b> · 저장한 문장은 모둠의 글 한 편이 돼요. 같은 문장을 다시 저장하면 마지막 것만 남아요.</div>
       <p class="muted">고칠 문장이 <b>하나씩</b> 나옵니다. ① 무엇이 문제인지 보고 ② 문장을 고치고 ③ <b>왜 이렇게 바꿨는지</b> 한 줄 적은 뒤 ④ '저장하고 다음 ▶'. 저장한 문장은 우리 모둠 태블릿 모두에 보여요. 처음엔 <b>내 역할(${esc(me.role)}) 담당 문장</b>만 나와요.</p>
       <div class="cards">${modeBtn('mine', '내 담당', items.filter(fmC).length)}${modeBtn('flag', '고칠 문장 전체', items.filter(i => i.added || (fm[i.key] || []).length || pk[i.key]).length)}${modeBtn('all', '모든 문장', items.length)}
         <span class="muted" style="margin-left:auto;align-self:center">이 목록에서 저장 ${savedN} / ${list.length}</span></div></div>
@@ -458,7 +463,7 @@ function renderReview() {
   const R = S.review || { changes: [], mine: {}, got: {} };
   const ch = R.changes;
   const done = ch.filter(c => R.mine[c.key]).length;
-  $('main').innerHTML = `<div class="paper"><h2>상호 심사 · ${R.target}모둠 복원본</h2>
+  $('main').innerHTML = `<div class="paper"><h2>상호 심사 · ${R.target}모둠 복원본</h2><div class="who g"><b>👥 모둠 대표 판정</b> · 문장마다 우리 모둠의 판정은 1개만 인정돼요 (마지막에 누른 것). 문장을 나눠 맡고, 한 줄 평은 대표 1명이 써요. 모둠 인원과 관계없이 문장당 최대 1점이에요.</div>
       <p class="muted">${R.target}모둠이 고친 문장마다 <b>원문 → 고친 문장 → 바꾼 이유</b>가 나와요. 이유가 타당한지 판단해서 '타당해요' 또는 '아쉬워요'를 누르세요. 아쉬우면 어떤 점이 아쉬운지 꼭 적어요. '타당해요' 1개마다 그 모둠에 +1점. 모둠에서 의논하고 문장을 나눠 맡아도 돼요.</p>
       <div class="counter" style="color:var(--ink)"><span>심사한 문장</span><span class="n" style="color:var(--ink)">${done} / ${ch.length}</span></div></div>` +
     (ch.length ? ch.map(c => {
@@ -468,10 +473,10 @@ function renderReview() {
         ${c.del ? '' : `<div class="rw" style="margin-top:6px">${esc(c.text)}</div>`}
         <div class="rec" style="margin-top:8px"><div class="m">바꾼 이유 · ${esc(c.who || '')}(${esc(c.role)})</div>${esc(c.reason || '(이유 없음)')}</div>
         <div class="btns"><button class="btn ${m && m.verdict === 'ok' ? '' : 'ghost'}" data-rl="${esc(c.key)}" data-v="ok">👍 타당해요</button><button class="btn ${m && m.verdict === 'no' ? 'red' : 'ghost'}" data-rl="${esc(c.key)}" data-v="no">🤔 아쉬워요</button></div>
-        <input type="text" id="rc_${esc(c.key)}" maxlength="300" value="${esc(m ? m.comment : '')}" placeholder="한마디 (아쉬워요는 꼭) 예) 이유는 맞지만 자료 위치가 빠졌다" style="margin-top:8px">
+        <input type="text" id="rc_${esc(c.key)}" maxlength="300" value="${esc(m ? m.comment : (TMP['rc_' + c.key] || ''))}" placeholder="한마디 (아쉬워요는 꼭) 예) 이유는 맞지만 자료 위치가 빠졌다" style="margin-top:8px">
         <div class="msg" id="rm_${esc(c.key)}">${m ? `✔ ${m.verdict === 'ok' ? '타당해요' : '아쉬워요'}로 심사함${m.who ? ' · ' + esc(m.who) : ''}` : ''}</div></div>`;
     }).join('') : `<div class="paper"><p class="muted">${R.target}모둠이 아직 고친 문장이 없어요.</p></div>`) +
-    `<div class="paper"><h2>${R.target}모둠에게 한 줄 평</h2><input type="text" id="allComment" maxlength="300" value="${esc(R.comment || '')}" placeholder="예) 출처 위치를 꼼꼼히 고쳤고, 결론이 조건부로 바뀌어 설득력이 생겼다">
+    `<div class="paper"><h2>${R.target}모둠에게 한 줄 평</h2><input type="text" id="allComment" maxlength="300" value="${esc(R.comment || TMP.allComment || '')}" placeholder="예) 출처 위치를 꼼꼼히 고쳤고, 결론이 조건부로 바뀌어 설득력이 생겼다">
       <div class="btns"><button class="btn red" id="sendAll">한 줄 평 제출</button></div><div class="msg" id="msgAll"></div></div>` +
     `<div class="paper"><h2>우리 모둠 글이 받은 심사</h2>${Object.keys(R.got || {}).length ? Object.keys(R.got).map(k => { const arr = R.got[k]; const it = allItems().find(i => i.key === k); return `<div class="rec"><div class="m">${esc(it ? it.sec : '')} · 👍 ${arr.filter(x => x.verdict === 'ok').length} · 🤔 ${arr.filter(x => x.verdict === 'no').length}</div>${esc(it ? it.text : '')}${arr.filter(x => x.comment).map(x => `<div class="m">“${esc(x.comment)}”</div>`).join('')}</div>`; }).join('') : '<p class="muted">아직 없어요.</p>'}</div>`;
 }
@@ -482,7 +487,7 @@ function partsHTML(parts) { return parts.map(p => p.c ? `<span class="chg">${esc
 function renderVote() {
   const V = S.vote || { sections: [], mine: {} };
   const done = V.sections.filter(s => V.mine[s.name]).length, total = V.sections.filter(s => s.cands.length).length;
-  $('main').innerHTML = `<div class="paper"><h2>베스트 투표</h2><p class="muted">구간마다 모둠들이 고친 글이 모둠 이름 없이 '1안, 2안…'으로 섞여 나옵니다. <span class="chg">밑줄</span>이 고친 부분이에요. 가장 잘 고쳤다고 생각하는 글을 구간마다 하나씩 고르세요. 다시 누르면 바꿀 수 있어요. 반 전체 투표 1등 글을 모아 마지막에 우리 반 보고서를 완성합니다.</p>
+  $('main').innerHTML = `<div class="paper"><h2>베스트 투표</h2><div class="who p"><b>👤 개인 투표</b> · 태블릿 한 대에 구간마다 한 표씩. 우리 모둠 글에 투표해도 돼요. 투표는 점수에 들어가지 않고, 우리 반 보고서에 실릴 글만 정해요.</div><p class="muted">구간마다 모둠들이 고친 글이 모둠 이름 없이 '1안, 2안…'으로 섞여 나옵니다. <span class="chg">밑줄</span>이 고친 부분이에요. 가장 잘 고쳤다고 생각하는 글을 구간마다 하나씩 고르세요. 다시 누르면 바꿀 수 있어요. 반 전체 투표 1등 글을 모아 마지막에 우리 반 보고서를 완성합니다.</p>
       <div class="counter" style="color:var(--ink)"><span>투표한 구간</span><span class="n" style="color:var(--ink)">${done} / ${total}</span></div></div>` +
     V.sections.map(sec => {
       if (!sec.cands.length) return `<div class="paper"><h3 style="margin-top:0">${esc(sec.name)}</h3><p class="muted">이 구간은 고친 모둠이 없어서 원문을 그대로 씁니다.</p></div>`;
@@ -539,7 +544,7 @@ function poll(force) {
   return call('state', me.group, VOTER).then(st => {
     const sig = JSON.stringify(st);
     const phaseChanged = !S || S.state.phase !== st.state.phase || S.state.cls !== st.state.cls;
-    if (store('case_cls') !== st.state.cls) { lineDraft = {}; saveDrafts(); store('case_cls', st.state.cls); }
+    if (store('case_cls') !== st.state.cls) { lineDraft = {}; saveDrafts(); TMP = {}; saveTmp(); store('case_cls', st.state.cls); }
     S = st;
     if (phaseChanged) { picked.clear(); card = ''; tab = 'report'; window.scrollTo(0, 0); }
     if (force || phaseChanged || (sig !== lastSig && !typing())) render();
@@ -622,6 +627,7 @@ document.addEventListener('focusin', e => { if (e.target.dataset && e.target.dat
 document.addEventListener('pointerdown', e => { if (e.target.closest('.tcard, [data-tt]')) e.preventDefault(); });
 document.addEventListener('input', e => {
   if (e.target.id === 'problem') editing = true;
+  if (/^rc_/.test(e.target.id) || e.target.id === 'allComment') { TMP[e.target.id] = e.target.value; saveTmp(); }
   if (e.target.id === 'lineText' || e.target.id === 'lineReason') { rwAct('stash'); const m = $('msg'); if (m && !m.classList.contains('err')) m.textContent = '✎ 저장 전이에요. \'저장하고 다음\'을 누르세요.'; }
 });
 
