@@ -131,6 +131,10 @@ textarea{resize:vertical;min-height:58px}
 .who.p{background:#efe9f7;border-left:5px solid #6b4fa0}
 .chg{text-decoration:underline 2px var(--ok);text-underline-offset:4px}
 .reldata{margin-top:10px;padding:10px;border-radius:10px;background:var(--ok-bg)}
+.helpbox{margin-top:10px;padding:10px 12px;border-radius:10px;border:1.5px dashed var(--gold);background:#fffaf0}
+.helpbox .el{display:inline-block;margin:4px 6px 0 0;padding:3px 10px;border-radius:999px;background:#fff;border:1px solid var(--rule);font-size:14px}
+.helpbox .el.ok{border-color:var(--ok);color:var(--ok);font-weight:700}
+.helpbox .model{margin-top:8px;padding:10px;border-radius:8px;background:#fff;border-left:4px solid var(--gold);font-size:15.5px;line-height:1.7}
 .stepbox{border:2px solid var(--ink);border-radius:12px;padding:12px;background:#fff}
 .stepbox .m{font-size:13px;color:var(--ink-soft)}
 .rw .cur{background:var(--pick)}
@@ -160,7 +164,7 @@ textarea{resize:vertical;min-height:58px}
 <div class="sheet" id="sheet"><div class="inner" id="sheetInner"></div></div>
 <div class="verdict" id="verdict"><div class="vbox" id="vbox"></div></div>
 
-<script src="common.js?v=16"></script>
+<script src="common.js?v=17"></script>
 <script>
 let B = null;              // boot: 글, 카드, 단서, 구역
 let S = null;              // 우리 모둠 상태
@@ -357,6 +361,7 @@ function renderRewrite() {
         ${!tags.length && !it.added && pk[it.key] ? '<div class="rec part" style="margin:6px 0 0">우리 모둠이 1라운드에서 짚은 문장이에요. 숨은 결함은 아니었지만 더 낫게 고쳐도 돼요.</div>' : ''}
         ${it.saved ? `<div class="m" style="margin-top:8px">💾 ${esc(it.saved.who || it.saved.role)}(${esc(it.saved.role)})이 저장함${it.draft ? ' · 지금 고치는 중인 내용은 아직 저장 전' : ''}</div>` : ''}
         ${relDataHTML(it, tags)}
+        ${helpHTML(it.sec, items)}
         <label>${it.del ? '이 문장은 빼기로 했어요' : '고친 문장'}</label>
         <textarea id="lineText" data-rw="${esc(it.key)}" style="min-height:96px" ${it.del ? 'disabled' : ''} placeholder="${it.added ? '새 문장을 쓰세요. 아래 카드 상자의 카드를 눌러 넣어도 돼요.' : ''}">${esc(it.text)}</textarea>
         <label for="lineReason">왜 이렇게 바꿨나요? <span style="font-weight:400;color:var(--ink-soft)">(상호 심사 때 다른 모둠이 이 이유를 보고 타당한지 판단해요)</span></label>
@@ -384,6 +389,21 @@ function relDataHTML(it, tags) {
   return `<div class="reldata"><div class="m"><b>📂 이 문장에 쓸 자료</b> · 출처만 넣거나, 자료 문장을 통째로 넣을 수 있어요</div>` +
     list.map(d => `<div class="ev" style="margin-top:6px"><div class="h">${esc(d.name)} · ${esc(d.loc)}${ids.has(d.id) ? ' <span class="tag" style="background:var(--gold)">추천</span>' : ' <span class="tag" style="background:var(--ink-soft)">원문에 쓰인 자료</span>'}</div><div class="b">${esc(d.text)}</div>
       <div class="cards" style="margin-top:6px"><button class="card tcard" data-ins="${esc('(' + d.name + ' · ' + d.loc + ')')}" data-word="1">출처만 넣기 (${esc(d.name)} · ${esc(d.loc)})</button><button class="card tcard" data-ins="${esc(d.name + ' · ' + d.loc + '에 따르면, ' + d.text + ' ')}">문장으로 넣기</button></div></div>`).join('') + `</div>`;
+}
+/* 문장 도움 (구간별): ① 방향 −1 → ② 예시 문장 (총 −2) */
+function normT(t) { return String(t || '').replace(/[\s.,·()"'“”‘’\[\]?!~]/g, ''); }
+function helpHTML(sec, items) {
+  if ((S.helpOk || []).indexOf(sec) < 0) return '';
+  const H = (S.helps || {})[sec], lv = H ? H.level : 0;
+  const now = normT(items.filter(i => i.sec === sec && !i.del).map(i => i.text).join(' '));
+  let h = `<div class="helpbox"><div class="m"><b>🆘 문장 도움 · ${esc(sec)}</b> · 막히면 모둠이 같이 열어 보세요. 열면 명탐정 기자 점수에서 빠져요.</div>`;
+  if (lv >= 1) h += `<div class="m" style="margin-top:6px">① 이 구간에 들어가면 좋은 것 <span class="muted">(초록색은 이미 들어 있어요)</span></div><div>${H.elements.map(a => `<span class="el ${a.some(x => now.indexOf(normT(x)) >= 0) ? 'ok' : ''}">${esc(a[0])}</span>`).join('')}</div>`;
+  if (lv >= 2) h += `<div class="m" style="margin-top:8px">② 예시 문장 <span class="muted">· 그대로 옮기면 투표 1등을 해도 베스트 점수를 받지 못해요. 우리 말로 바꿔 쓰세요.</span></div><div class="model">${esc(H.model)}</div>`;
+  h += `<div class="btns" style="margin-top:8px">` +
+    (lv < 1 ? `<button class="btn ghost" data-help="1" data-sec="${esc(sec)}">① 방향 보기 (−1)</button>` : '') +
+    (lv < 2 ? `<button class="btn ghost" data-help="2" data-sec="${esc(sec)}">② 예시 문장 보기 (${lv >= 1 ? '−1 더, 총 −2' : '총 −2'})</button>` : '') +
+    `</div><div class="msg" id="helpMsg"></div></div>`;
+  return h;
 }
 function curSec() { const it = allItems().find(i => i.key === curKey); return it ? it.sec : ''; }
 function unsaved() { return Object.keys(lineDraft).length > 0; }
@@ -487,10 +507,10 @@ function partsHTML(parts) { return parts.map(p => p.c ? `<span class="chg">${esc
 function renderVote() {
   const V = S.vote || { sections: [], mine: {} };
   const done = V.sections.filter(s => V.mine[s.name]).length, total = V.sections.filter(s => s.cands.length).length;
-  $('main').innerHTML = `<div class="paper"><h2>베스트 투표</h2><div class="who p"><b>👤 개인 투표</b> · 태블릿 한 대에 구간마다 한 표씩. 우리 모둠 글에 투표해도 돼요. 투표는 점수에 들어가지 않고, 우리 반 보고서에 실릴 글만 정해요.</div><p class="muted">구간마다 모둠들이 고친 글이 모둠 이름 없이 '1안, 2안…'으로 섞여 나옵니다. <span class="chg">밑줄</span>이 고친 부분이에요. 가장 잘 고쳤다고 생각하는 글을 구간마다 하나씩 고르세요. 다시 누르면 바꿀 수 있어요. 반 전체 투표 1등 글을 모아 마지막에 우리 반 보고서를 완성합니다.</p>
+  $('main').innerHTML = `<div class="paper"><h2>베스트 투표</h2><div class="who p"><b>👤 개인 투표</b> · 태블릿 한 대에 구간마다 한 표씩. 우리 모둠 글은 보이지 않아요. 구간마다 1등 글(공동 1등 포함)을 쓴 모둠은 명탐정 기자 점수 +${V.bestPts || 3}, 그 글이 우리 반 보고서에 실려요.</div><p class="muted">구간마다 모둠들이 고친 글이 모둠 이름 없이 '1안, 2안…'으로 섞여 나옵니다. <span class="chg">밑줄</span>이 고친 부분이에요. 가장 잘 고쳤다고 생각하는 글을 구간마다 하나씩 고르세요. 다시 누르면 바꿀 수 있어요. 반 전체 투표 1등 글을 모아 마지막에 우리 반 보고서를 완성합니다.</p>
       <div class="counter" style="color:var(--ink)"><span>투표한 구간</span><span class="n" style="color:var(--ink)">${done} / ${total}</span></div></div>` +
     V.sections.map(sec => {
-      if (!sec.cands.length) return `<div class="paper"><h3 style="margin-top:0">${esc(sec.name)}</h3><p class="muted">이 구간은 고친 모둠이 없어서 원문을 그대로 씁니다.</p></div>`;
+      if (!sec.cands.length) return `<div class="paper"><h3 style="margin-top:0">${esc(sec.name)}</h3><p class="muted">${sec.own ? '이 구간은 우리 모둠 글만 있어서 투표할 글이 없어요.' : '이 구간은 고친 모둠이 없어서 원문을 그대로 씁니다.'}</p></div>`;
       const order = shuffleFor(sec.cands, (S.state.cls || '') + '|' + sec.name);
       return `<div class="paper"><h3 style="margin-top:0">${esc(sec.name)} ${V.mine[sec.name] ? '<span class="ok">· 투표 완료</span>' : ''}</h3>
         <div class="orig"><b>원문</b> ${esc(sec.original)}</div>` +
@@ -579,6 +599,16 @@ document.addEventListener('click', e => {
       $('vbox').innerHTML = `<div class="stampmark gold">힌트</div><div class="t">${esc(r.text)}</div><div class="btns"><button class="btn" id="closeV">확인</button></div>`;
       $('verdict').classList.add('show'); return poll(true);
     }).catch(err => { $('vbox').innerHTML = `<div class="t">${esc(err)}</div><div class="btns"><button class="btn" id="closeV">확인</button></div>`; $('verdict').classList.add('show'); });
+    return;
+  }
+  const hp = t.closest('[data-help]'); if (hp) {
+    const lv = Number(hp.dataset.help), sec = hp.dataset.sec;
+    if (!confirm2(hp, lv === 1 ? '한 번 더 누르면 열려요 (−1점)' : '한 번 더 누르면 예시 문장이 열려요')) return;
+    if ($('lineText')) rwAct('stash');
+    hp.disabled = true; setMsg('helpMsg', '여는 중...');
+    call('useHelp', who({ section: sec, level: lv }))
+      .then(r => { S.helps = S.helps || {}; S.helps[sec] = r; render(); return poll(true); })
+      .catch(err => { setMsg('helpMsg', err, true); hp.disabled = false; });
     return;
   }
   if (t.id === 'submitFind') {

@@ -80,7 +80,7 @@ header{display:flex;align-items:center;gap:14px;padding:10px 20px;color:#e8efec;
 .rank{display:flex;align-items:center;gap:20px;background:#fff;border-radius:14px;padding:16px 22px;margin-bottom:12px;font-size:1.1em;opacity:0;transform:translateY(16px);transition:all .6s}
 .rank.in{opacity:1;transform:none}
 .rank .no{font-family:var(--mono);font-size:1.4em;font-weight:700;width:90px;white-space:nowrap}
-.rank .gr{margin-left:auto;font-family:var(--display);font-weight:800;color:var(--stamp);font-size:1.1em}
+.rank .gr{margin-left:auto;font-family:var(--display);font-weight:800;color:var(--stamp);font-size:1.1em;white-space:nowrap}
 .rank .det{font-size:.6em;color:var(--ink-soft)}
 .rank.first{outline:4px solid var(--gold);background:var(--gold-bg)}
 .login{position:fixed;inset:0;background:rgba(18,28,31,.85);display:none;align-items:center;justify-content:center;z-index:50}
@@ -124,7 +124,7 @@ header{display:flex;align-items:center;gap:14px;padding:10px 20px;color:#e8efec;
 <div class="login" id="login"><div class="box"><b>교사 비밀번호</b><input type="password" id="pin" inputmode="numeric" autocomplete="off"><div style="display:flex;gap:8px"><button class="tool red" id="pinOk" style="flex:1">확인</button><button class="tool" id="pinCancel">닫기</button></div><div id="pinMsg" style="color:var(--stamp);margin-top:8px"></div></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="common.js?v=16"></script>
+<script src="common.js?v=17"></script>
 <script>
 let peek = false;   /* 1라운드 발견 위치·4라운드 득표를 칠판에 보일지 (기본: 가림) */
 let present = false, presSel = null; const presOpen = new Set();   /* 4라운드 투표 뒤 구간별 베스트 발표 */
@@ -246,6 +246,7 @@ function vPresent() {
       return `<div class="paper" style="padding:26px 32px">
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap"><div class="stamp" style="font-size:1em;transform:none;background:#fff">${W.win.length > 1 ? '공동 1등' : '베스트'}</div>
           <h2 style="margin:0;font-size:1.45em">${esc(sec.name)} · ${g}모둠</h2><span style="font-size:1.1em">👍 ${W.max}표</span></div>
+        ${(() => { const b = ((V.best || {})[sec.name] || { win: [] }).win.find(x => x.g === g); return b ? (b.copied ? `<p class="muted" style="margin:10px 0 0">예시 문장 활용 · 예시 문장과 ${b.sim}% 같아서 베스트 점수는 없어요.</p>` : `<p style="margin:10px 0 0;color:var(--ok);font-weight:700">명탐정 기자 점수 +${V.bestPts || 3}</p>`) : ''; })()}
         <p style="font-size:1.15em;margin:14px 0 18px">🎤 <b>${g}모둠</b>, 왜 이렇게 고쳤는지 읽어 주세요.</p>
         ${ch.map(c => { const r = ok(c.key);
           return `<div class="pchg">
@@ -291,7 +292,7 @@ function vResult() {
   let body = '';
   if (rtab === 'rank') {
     const order = R.rank.map((r, i) => ({ ...r, place: i + 1 }));
-    body = `<div class="paper" style="max-width:1000px;margin:0 auto;width:100%"><h2>최종 순위 <span class="muted">만점 ${R.max}점</span></h2><div id="ranks">${order.map(r => `<div class="rank ${r.place === 1 ? 'first' : ''} ${revealDone ? 'in' : ''}" data-place="${r.place}"><span class="no">${r.place}위</span><div><b>${r.group}모둠</b> · ${r.total}점<div class="det">결함 ${r.flawsFound}개 · 발견 ${r.find} · 역할 보너스 ${r.bonus} · 타당해요 ${r.review} · 힌트 −${r.hint}</div></div><span class="gr">${esc(r.grade)}</span></div>`).join('')}</div></div>`;
+    body = `<div class="paper" style="max-width:1000px;margin:0 auto;width:100%"><h2>최종 순위 <span class="muted">만점 ${R.max}점</span></h2><div id="ranks">${order.map(r => `<div class="rank ${r.place === 1 ? 'first' : ''} ${revealDone ? 'in' : ''}" data-place="${r.place}"><span class="no">${r.place}위</span><div><b>${r.group}모둠</b> · ${r.total}점<div class="det">결함 ${r.flawsFound}개 · 발견 ${r.find} · 역할 보너스 ${r.bonus} · 타당해요 ${r.review} · 베스트 ${r.best || 0}${(r.bestSecs || []).length ? ' (' + r.bestSecs.map(esc).join(', ') + ')' : ''} · 힌트 −${r.hint} · 문장 도움 −${r.help || 0}${(r.copied || []).length ? ' · 예시 문장 활용: ' + r.copied.map(esc).join(', ') : ''}</div></div><span class="gr">${esc(r.grade)}</span></div>`).join('')}</div></div>`;
   } else if (rtab === 'report') {
     body = `<div class="paper" style="max-width:1200px;margin:0 auto;width:100%"><h2>우리 반이 함께 완성한 보고서 <span class="muted">구간마다 투표 1등 글</span></h2>` +
       R.restored.map(s => `<h3>${esc(s.name)} ${s.by ? `<span class="status">· ${s.by}모둠 · 👍 ${s.votes}표</span>` : '<span class="muted">· 원문</span>'}</h3><div class="rw">${partsHTML(s.parts)}</div>`).join('') + `</div>`;
@@ -333,12 +334,13 @@ function render() {
 
 /* ---------- 반·기록 관리 ---------- */
 let A = null, aType = '', aGroup = 0, aHidden = false;
-const TYPE_NAME = { find: '결함 수사', hint: '힌트', line: '고친 문장', rline: '문장 심사', review: '한 줄 평', vote: '투표' };
+const TYPE_NAME = { find: '결함 수사', hint: '힌트', help: '문장 도움', line: '고친 문장', rline: '문장 심사', review: '한 줄 평', vote: '투표' };
 function openAdmin() { $('admin').classList.add('show'); loadAdmin(); }
 function loadAdmin() { return call('admin', pin).then(a => { A = a; renderAdmin(); }).catch(err => { $('adminBox').innerHTML = esc(err); }); }
 function summary(e) {
   if (e.type === 'find') return `${e.card}${e.problem ? ' · ' + e.problem : ''} <span class="muted">(${e.result.split(':')[0] === 'full' ? '정답' : e.result.split(':')[0] === 'part' ? '문장만' : '기록'})</span>`;
   if (e.type === 'hint') return esc(e.problem);
+  if (e.type === 'help') return `${esc(e.target)} · ${e.card === '2' ? '② 예시 문장 (총 −2)' : '① 방향 (−1)'}`;
   if (e.type === 'rewrite') return `<b>${esc(e.target)}</b> ${esc(e.fix.slice(0, 80))}${e.fix.length > 80 ? '…' : ''}`;
   if (e.type === 'line') { const k = /^\d+-\d+$/.test(e.key) ? `${secName(e.key)} ${Number(e.key.split('-')[1]) + 1}번째` : esc(e.target) + ' 새 문장'; return e.card === 'del' ? `${k} · 문장 삭제 <span class="muted">(${esc(e.problem)})</span>` : `${k} · ${esc(e.fix.slice(0, 70))}${e.fix.length > 70 ? '…' : ''} <span class="muted">(이유: ${esc(e.problem)})</span>`; }
   if (e.type === 'rline') return `${esc(e.target)}모둠 ${/^\d+-\d+$/.test(e.key) ? esc(secName(e.key)) : '새 문장'} · ${e.card === 'ok' ? '👍 타당해요' : '🤔 아쉬워요'}${e.problem ? ' · ' + esc(e.problem) : ''}`;

@@ -69,6 +69,7 @@ function setupGame() {
     ['역할 (쉼표로 구분)', '팩트체크,윤리·공정,현실·실행,환경·미래'],
     ['교사 비밀번호', '1234'],
     ['힌트 감점', 1],
+    ['베스트 문장 점수', 3],
     ['반 목록 (쉼표로 구분)', '2-2(B-연구),2-2(D-일반),test']
   ], [160, 420]);
 
@@ -179,7 +180,7 @@ function doPost(e) {
   try {
     const req = JSON.parse(e.postData.contents || '{}');
     const api = {
-      boot: boot, state: studentState, submitFind: submitFind, useHint: useHint,
+      boot: boot, state: studentState, submitFind: submitFind, useHint: useHint, useHelp: useHelp,
       saveLine: saveLine, submitRline: submitRline, submitReviewAll: submitReviewAll, submitSelf: submitSelf, submitVote: submitVote,
       board: boardState, setPhase: setPhase, toggleHide: toggleHide, checkPin: checkPin,
       admin: admin, openClass: openClass, addClass: addClass, resetClass: resetClass, setHidden: setHidden
@@ -214,6 +215,7 @@ function conf0_() {
     roles: String(c['역할 (쉼표로 구분)'] || '').split(',').map(s => s.trim()).filter(Boolean),
     pin: String(c['교사 비밀번호'] || ''),
     hintCost: Number(c['힌트 감점'] || 1),
+    bestPts: Number(c['베스트 문장 점수'] || 3),
     classes: keyStr_(c['반 목록 (쉼표로 구분)'] || '2-2(B-연구),2-2(D-일반),test').split(',').map(s => s.trim()).filter(Boolean)
   };
 }
@@ -327,7 +329,7 @@ function clean_(s, n) { return String(s || '').trim().slice(0, n || 500); }
 /* ================= 점수 계산 ================= */
 function score_(log, flaws, conf) {
   const groups = {};
-  for (let g = 1; g <= conf.groups; g++) groups[g] = { group: g, flaws: {}, find: 0, bonus: 0, hint: 0, review: 0, total: 0 };
+  for (let g = 1; g <= conf.groups; g++) groups[g] = { group: g, flaws: {}, find: 0, bonus: 0, hint: 0, review: 0, help: 0, best: 0, bestSecs: [], copied: [], total: 0 };
   const byCode = {}; flaws.forEach(f => byCode[f.code] = f);
 
   log.forEach(e => {
@@ -349,9 +351,19 @@ function score_(log, flaws, conf) {
     if (e.card === 'ok') T.review += 1;
   });
 
+  // 2라운드 문장 도움: 구간마다 연 단계까지 (① −1, ②까지 총 −2)
+  const H = helpLevels_(log);
+  Object.keys(H).forEach(k => { const G = groups[Number(k.split('|')[0])]; if (G) G.help += H[k]; });
+
+  // 4라운드 구간 베스트(투표 1등, 공동 1등 포함): +3. 예시 문장을 열고 거의 그대로 쓴 글은 보너스 없음
+  Object.values(best_(log, conf)).forEach(b => b.win.forEach(w => {
+    const G = groups[w.g]; if (!G) return;
+    if (w.copied) G.copied.push(b.name); else { G.best += conf.bestPts; G.bestSecs.push(b.name); }
+  }));
+
   Object.values(groups).forEach(G => {
     Object.values(G.flaws).forEach(f => { G.find += f.pts; if (f.roleHit) G.bonus += 1; });
-    G.total = G.find + G.bonus + G.review - G.hint;
+    G.total = G.find + G.bonus + G.review + G.best - G.hint - G.help;
   });
   return groups;
 }
@@ -407,9 +419,11 @@ function studentState(group, voter) {
     found: Object.values(found).map(f => ({ code: f.code, section: f.section, keys: f.hitKeys, kind: f.kind, card: f.card, evidence: f.evidence, note: f.note, locked: f.kind !== 'full' && f.tries >= 2 })),
     data: data.map(d => (allOpen || opened[d.id]) ? d : { id: d.id, name: d.name, loc: d.loc, locked: true }),
     hints: hints,
+    helps: st.phase >= 2 ? (() => { const o = {}; const H = helpLevels_(mine); Object.keys(H).forEach(k => { const n = k.split('|').slice(1).join('|'); o[n] = helpPack_(n, H[k]); }); return o; })() : {},
+    helpOk: st.phase === 2 ? Object.keys(models_()) : [],
     lines: myLines,
     review: st.phase >= 3 ? { target, changes: changes_(lines_(log, target)), mine: myR, comment: allC ? allC.problem : '', got: gotR } : null,
-    vote: st.phase >= 4 ? (() => { const V = votes_(log); const mineV = {}; Object.values(V.latest).filter(e => e.keys[0] === String(voter || '')).forEach(e => mineV[e.target] = Number(e.card)); return { sections: candidates_(log, conf), mine: mineV }; })() : null,
+    vote: st.phase >= 4 ? (() => { const V = votes_(log); const mineV = {}; Object.values(V.latest).filter(e => e.keys[0] === String(voter || '')).forEach(e => mineV[e.target] = Number(e.card)); return { sections: candidates_(log, conf).map(s => Object.assign({}, s, { cands: s.cands.filter(c => c.g !== group), own: s.cands.some(c => c.g === group) })), mine: mineV, bestPts: conf.bestPts }; })() : null,
     selfs: mine.filter(e => e.type === 'self').map(e => ({ role: e.role, card: e.card, problem: e.problem, fix: e.fix })),
     allFlaws: st.phase >= 2 ? flaws.map(f => ({ code: f.code, card: f.card, note: f.note, evidence: f.evidence, keys: f.keys, role: f.role, words: f.words || [], found: !!(found[f.code] && found[f.code].kind === 'full') })) : [],
     foundCards: st.phase >= 4 ? classCards_(log, flaws) : [],
@@ -490,6 +504,30 @@ function useHint(p) {
   const text = `${pick.section}에 「${pick.card}」 결함이 숨어 있다.`;
   append_(['hint', g, p.role, '', '', '', text, '', pick.code, '', ''], p.who);
   return { text };
+}
+
+/* ---------- 2라운드: 문장 도움 (구간별 2단계) ---------- */
+// ① 방향: 이 구간에 들어가야 할 핵심 요소 (−1)  ② 예시 문장: 모범 글 (①과 합쳐 총 −2)
+const COPY_LINE = 0.8;   // 예시 문장을 연 모둠의 글이 예시와 80% 이상 같으면 베스트 보너스 없음
+function helpLevels_(log) {
+  const m = {};
+  log.filter(e => e.type === 'help').forEach(e => { const k = e.group + '|' + e.target; m[k] = Math.max(m[k] || 0, Number(e.card) || 0); });
+  return m;
+}
+function helpPack_(name, level) {
+  const md = models_()[name]; if (!md) return null;
+  return { level, elements: md.elements.map(a => a), model: level >= 2 ? md.text : '' };
+}
+function useHelp(p) {
+  needClass_();
+  const st = getState_(); need_(st.phase === 2, '문장 도움은 보고서 복원 시간에만 쓸 수 있어요.');
+  const conf = conf_(); const g = Number(p.group); checkGroupRole_(g, p.role, conf);
+  const sec = String(p.section || ''), level = Number(p.level);
+  need_(models_()[sec], '이 구간은 문장 도움이 없어요.');
+  need_(level === 1 || level === 2, '도움 단계를 다시 골라 주세요.');
+  const cur = helpLevels_(log_().filter(e => e.group === g))[g + '|' + sec] || 0;
+  if (level > cur) append_(['help', g, p.role, '', '', String(level), level === 1 ? '방향 보기' : '예시 문장 보기', '', '', sec, ''], p.who);
+  return helpPack_(sec, Math.max(level, cur));
 }
 
 /* ---------- 2라운드: 문장 단위 고쳐 쓰기 ---------- */
@@ -640,8 +678,22 @@ function submitVote(p) {
   const sec = String(p.section || ''), cand = Number(p.cand);
   const c = candidates_(log_(), conf).find(x => x.name === sec);
   need_(c && c.cands.some(x => x.g === cand), '투표할 수 없는 글이에요.');
+  need_(cand !== g, '우리 모둠 글에는 투표할 수 없어요.');
   append_(['vote', g, p.role, voter, '', String(cand), '', '', '', sec, ''], p.who);
   return { ok: true };
+}
+/* 구간별 베스트: 투표 1등(공동 1등 모두). 예시 문장을 연 모둠이 예시와 거의 같게 쓰면 copied */
+function best_(log, conf) {
+  const V = votes_(log), H = helpLevels_(log), M = models_(), out = {};
+  candidates_(log, conf).forEach(s => {
+    const t = s.cands.map(c => ({ c, n: V.tally[s.name + '|' + c.g] || 0 }));
+    const max = Math.max(0, ...t.map(x => x.n));
+    out[s.name] = { name: s.name, max, win: max ? t.filter(x => x.n === max).map(x => {
+      const sim = M[s.name] ? dice_(x.c.text, M[s.name].text) : 0;
+      return { g: x.c.g, sim: Math.round(sim * 100), copied: (H[x.c.g + '|' + s.name] || 0) >= 2 && sim >= COPY_LINE };
+    }) : [] };
+  });
+  return out;
 }
 function finalReport_(log, conf) {
   const V = votes_(log);
@@ -812,6 +864,7 @@ function boardState(pin) {
     finds: log.filter(e => e.group === g && e.type === 'find').length,
     lines: changes_(lines_(log, g)).length,
     reviews: Object.values(lastRline_(log)).filter(e => e.group === g).length,
+    helps: Object.keys(helpLevels_(log)).filter(k => k.split('|')[0] === String(g)).length,
     toReview: changes_(lines_(log, reviewTarget_(g, conf.groups))).length,
     selfs: log.filter(e => e.group === g && e.type === 'self').length
   };
@@ -824,7 +877,7 @@ function boardState(pin) {
     teacher, state: st,
     finds: log.filter(e => e.type === 'find').map(e => ({ id: e.id, group: e.group, role: e.role, keys: e.keys, card: e.card, problem: e.problem, fix: e.fix, hit: e.result.split(':')[0] || 'none' })),
     flawMap, progress, essays, changes, rlines, reviews, selfs,
-    vote: st.phase >= 4 ? { sections: candidates_(log, conf).map(x => ({ name: x.name, cands: x.cands.map(c => ({ g: c.g, parts: c.parts })) })), tally: votes_(log).tally, voters: new Set(Object.values(votes_(log).latest).map(e => e.keys[0])).size } : null,
+    vote: st.phase >= 4 ? { sections: candidates_(log, conf).map(x => ({ name: x.name, cands: x.cands.map(c => ({ g: c.g, parts: c.parts })) })), tally: votes_(log).tally, best: best_(log, conf), bestPts: conf.bestPts, voters: new Set(Object.values(votes_(log).latest).map(e => e.keys[0])).size } : null,
     result: st.phase >= 5 && st.reveal ? resultPack_(log, flaws, conf) : null
   };
 }
@@ -832,9 +885,9 @@ function boardState(pin) {
 function resultPack_(log, flaws, conf) {
   const groups = score_(log, flaws, conf);
   const flawKeys = new Set(); flaws.forEach(f => f.keys.forEach(k => flawKeys.add(k)));
-  const max = flaws.length * 4 + flawKeys.size;
+  const max = flaws.length * 4 + flawKeys.size + conf.bestPts * Math.ceil(sections_().length / conf.groups);
   const rank = Object.values(groups).sort((a, b) => b.total - a.total).map(G => ({
-    group: G.group, total: G.total, find: G.find, bonus: G.bonus, review: G.review, hint: G.hint,
+    group: G.group, total: G.total, find: G.find, bonus: G.bonus, review: G.review, hint: G.hint, help: G.help, best: G.best, bestSecs: G.bestSecs, copied: G.copied,
     flawsFound: Object.values(G.flaws).filter(f => f.pts === 3).length, grade: grade_(G.total, max)
   }));
   // 반 전체 투표로 완성한 보고서 + 모범 답안 대비 완성도
