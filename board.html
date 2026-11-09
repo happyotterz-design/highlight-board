@@ -126,7 +126,7 @@ header{display:flex;align-items:center;gap:14px;padding:10px 20px;color:#e8efec;
 <div class="login" id="login"><div class="box"><b>교사 비밀번호</b><input type="password" id="pin" inputmode="numeric" autocomplete="off"><div style="display:flex;gap:8px"><button class="tool red" id="pinOk" style="flex:1">확인</button><button class="tool" id="pinCancel">닫기</button></div><div id="pinMsg" style="color:var(--stamp);margin-top:8px"></div></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="common.js?v=21"></script>
+<script src="common.js?v=22"></script>
 <script>
 let peek = false;   /* 1라운드 발견 위치·4라운드 득표를 칠판에 보일지 (기본: 가림) */
 let present = false, presSel = null; const presOpen = new Set();   /* 4라운드 투표 뒤 구간별 베스트 발표 */
@@ -277,7 +277,37 @@ function vVote() {
 }
 
 /* 5 결과: 순위 → 완성된 보고서 → 완성도 → 오늘 잡은 결함 → 다음 시간 */
-let rtab = 'rank';
+let rtab = 'rank', missSel = 0;
+/* 가장 많이 틀린 결함: 결함 문장을 고르고도 카드를 잘못 고른 횟수가 많은 순 */
+function missStats() {
+  const cardDesc = n => (B.cards.find(c => c.name === n) || {}).desc || '';
+  return (D.flawMap || []).filter(f => f.keys && f.keys.length).map(f => {
+    const at = (D.finds || []).filter(x => x.keys.some(k => f.keys.indexOf(k) >= 0));
+    const wrong = at.filter(x => x.card !== f.card);
+    const cnt = {}; wrong.forEach(x => cnt[x.card] = (cnt[x.card] || 0) + 1);
+    const tried = new Set(at.map(x => x.group)).size;
+    return { code: f.code, section: f.section, card: f.card, desc: cardDesc(f.card), note: f.note, keys: f.keys, groups: f.groups, tried, wrong: wrong.length,
+      cards: Object.keys(cnt).map(n => ({ name: n, n: cnt[n], desc: cardDesc(n) })).sort((a, b) => b.n - a.n) };
+  }).filter(x => x.wrong > 0).sort((a, b) => b.wrong - a.wrong || a.groups - b.groups).slice(0, 3);
+}
+function vMiss() {
+  const M = missStats();
+  if (!M.length) return `<div class="paper" style="max-width:1100px;margin:0 auto;width:100%"><h2>가장 많이 틀린 결함</h2><p class="muted">결함 문장에서 카드를 잘못 고른 기록이 없어요.</p></div>`;
+  const m = M[Math.min(missSel, M.length - 1)];
+  const ng = Object.keys(D.progress || {}).length;
+  return `<div class="paper" style="max-width:1200px;margin:0 auto;width:100%;padding:26px 34px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0">가장 많이 헷갈린 결함</h2>
+      ${M.map((x, i) => `<button class="tool ${i === missSel ? 'red' : ''}" data-miss="${i}">${i + 1}위 · ${esc(x.section)}</button>`).join('')}</div>
+    <div class="m" style="margin-top:14px">${esc(m.section)} · ${ng}모둠 중 ${m.groups}모둠이 찾음 · 카드를 잘못 고른 횟수 ${m.wrong}번</div>
+    <div class="orig" style="font-size:1.15em;margin-top:6px">${m.keys.map(k => esc(sentence(k))).join(' ')}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+      <div class="cm part" style="margin:0"><div class="m">우리 반이 많이 고른 카드</div>${m.cards.map(c => `<div style="margin-top:8px"><b>${esc(c.name)}</b> <span class="muted">${c.n}번</span><div class="muted" style="font-size:.85em">${esc(c.desc)}</div></div>`).join('')}</div>
+      <div class="cm full" style="margin:0;border-left-color:var(--ok)"><div class="m">정답 카드</div><div style="margin-top:8px;font-size:1.3em"><b>${esc(m.card)}</b></div><div class="muted" style="font-size:.9em">${esc(m.desc)}</div><div style="margin-top:10px">${esc(m.note)}</div></div>
+    </div>
+    <div class="cm" style="margin-top:16px;border-left:5px solid var(--gold)"><div class="m">함께 생각해 보기</div><div style="font-size:1.1em;margin-top:4px">🎤 ${esc(FLAW_ASK[m.code] || '')}</div></div>
+    ${FLAW_EXAMPLE[m.code] ? `<div class="cm full" style="margin-top:16px;border-left-color:var(--ok)"><div class="m">이렇게 고칠 수 있어요 · 예시 답</div><div style="font-size:1.15em;line-height:1.7;margin-top:6px">${esc(FLAW_EXAMPLE[m.code])}</div></div>` : ''}
+  </div>`;
+}
 const NEXT_NOTICE = [
   '오늘 찾은 결함들은 여러분 초안에도 숨어 있을 수 있어요.',
   '다음 시간에는 여러분이 직접 쓴 초안을 이름을 가린 익명으로 바꿔서 동료평가, 교사평가, AI 평가를 함께 진행합니다. 오늘 쓴 결함 카드가 그때의 평가 기준이 됩니다.',
@@ -289,7 +319,7 @@ function vResult() {
       <div style="color:#e8efec;font-size:1em">과연 명탐정은 어느 모둠일까?</div>${teacher() ? '<button class="tool red" id="reveal" style="font-size:24px;padding:14px 30px">결과 공개</button>' : ''}</div>`;
   }
   const R = D.result;
-  const tabs = [['rank', '① 최종 순위'], ['report', '② 우리 반 보고서'], ['score', '③ 완성도'], ['caught', '④ 오늘 잡은 결함'], ['closed', '⑤ 사건 종결'], ['next', '⑥ 다음 시간']];
+  const tabs = [['rank', '① 최종 순위'], ['report', '② 우리 반 보고서'], ['score', '③ 완성도'], ['caught', '④ 오늘 잡은 결함'], ['miss', '⑤ 가장 헷갈린 결함'], ['closed', '⑥ 사건 종결'], ['next', '⑦ 다음 시간']];
   const head = `<div class="gtabs" style="grid-column:1/-1">${tabs.map(t => `<button data-rt="${t[0]}" class="${rtab === t[0] ? 'on' : ''}">${t[1]}</button>`).join('')}</div>`;
   let body = '';
   if (rtab === 'rank') {
@@ -306,6 +336,8 @@ function vResult() {
   } else if (rtab === 'caught') {
     body = `<div class="paper" style="max-width:1200px;margin:0 auto;width:100%"><h2>오늘 우리가 잡은 결함</h2>` +
       R.caught.map(f => `<div class="cm ${f.groups ? 'full' : 'part'}"><div class="m">${esc(f.section)} · ${f.groups ? f.groups + '개 모둠이 찾음' : '아무도 못 찾음'}</div><b style="font-size:1.05em">${esc(f.card)}</b> · ${esc(f.note)}</div>`).join('') + `</div>`;
+  } else if (rtab === 'miss') {
+    body = vMiss();
   } else if (rtab === 'closed') {
     const C = caseClosed(R, D.state.cls);
     body = `<div class="paper" style="max-width:1100px;margin:0 auto;width:100%;padding:34px 44px;position:relative">
@@ -418,6 +450,7 @@ document.addEventListener('click', e => {
   const k = t.closest('[data-k]'); if (k && phase() === 1 && peek) { sel = sel === k.dataset.k ? null : k.dataset.k; render(); return; }
   const h = t.closest('[data-hide]'); if (h) { h.disabled = true; call('toggleHide', pin, h.dataset.hide).then(() => poll(true)); return; }
   const rtb = t.closest('[data-rt]'); if (rtb) { rtab = rtb.dataset.rt; render(); return; }
+  const mss = t.closest('[data-miss]'); if (mss) { missSel = Number(mss.dataset.miss); render(); return; }
   const gt = t.closest('[data-gt]'); if (gt) { gtab = Number(gt.dataset.gt); render(); return; }
   const cs = t.closest('[data-cs]'); if (cs) { cardSel = cs.dataset.cs; render(); return; }
   const ph = t.closest('[data-ph]'); if (ph && teacher()) { go(Number(ph.dataset.ph)); return; }
