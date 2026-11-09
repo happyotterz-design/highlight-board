@@ -126,7 +126,7 @@ header{display:flex;align-items:center;gap:14px;padding:10px 20px;color:#e8efec;
 <div class="login" id="login"><div class="box"><b>교사 비밀번호</b><input type="password" id="pin" inputmode="numeric" autocomplete="off"><div style="display:flex;gap:8px"><button class="tool red" id="pinOk" style="flex:1">확인</button><button class="tool" id="pinCancel">닫기</button></div><div id="pinMsg" style="color:var(--stamp);margin-top:8px"></div></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="common.js?v=22"></script>
+<script src="common.js?v=23"></script>
 <script>
 let peek = false;   /* 1라운드 발견 위치·4라운드 득표를 칠판에 보일지 (기본: 가림) */
 let present = false, presSel = null; const presOpen = new Set();   /* 4라운드 투표 뒤 구간별 베스트 발표 */
@@ -230,11 +230,24 @@ function presWinners(sec, V) {
   const max = Math.max(0, ...t.map(x => x.n));
   return { max, win: max ? t.filter(x => x.n === max).map(x => x.g) : [], all: t.sort((a, b) => b.n - a.n) };
 }
+/* 공동 1등이면 발표 모둠 하나: ① 앞 구간에서 발표를 덜 한 모둠 ② 이 구간 '타당해요'가 많은 모둠 ③ 모둠 번호가 작은 모둠 */
+function presSpeakers(V) {
+  const done = {}, out = {};
+  [...presOpen].forEach(name => {
+    const sec = V.sections.find(x => x.name === name); if (!sec) return;
+    const W = presWinners(sec, V); if (!W.win.length) return;
+    const okN = g => (D.changes[g] || []).filter(c => c.sec === name).filter(c => (D.rlines || []).some(r => r.target === g && r.key === c.key && r.verdict === 'ok')).length;
+    const pick = W.win.slice().sort((a, b) => (done[a] || 0) - (done[b] || 0) || okN(b) - okN(a) || a - b)[0];
+    out[name] = pick; done[pick] = (done[pick] || 0) + 1;
+  });
+  return out;
+}
 function vPresent() {
   const V = D.vote || { sections: [], tally: {}, voters: 0 };
+  const SP = presSpeakers(V);
   const cards = V.sections.map(sec => {
     const W = presWinners(sec, V), open = presOpen.has(sec.name), on = presSel === sec.name;
-    const sub = !sec.cands.length ? '고친 모둠 없음' : !W.max ? '투표 없음' : open ? `${W.win.map(g => g + '모둠').join(' · ')} · 👍 ${W.max}표${W.win.length > 1 ? ' · 공동 1등' : ''}` : '누르면 1등 공개';
+    const sub = !sec.cands.length ? '고친 모둠 없음' : !W.max ? '투표 없음' : open ? `${W.win.map(g => g + '모둠').join(' · ')} · 👍 ${W.max}표${W.win.length > 1 ? ' · 🎤 ' + SP[sec.name] + '모둠' : ''}` : '누르면 1등 공개';
     return `<button data-ps="${esc(sec.name)}" class="pcard ${on ? 'on' : ''} ${open ? 'open' : ''}"><b>${esc(sec.name)}</b><span>${open || !W.max ? esc(sub) : '?'}</span>${open || !W.max ? '' : `<small>${esc(sub)}</small>`}</button>`;
   }).join('');
   let body = `<div class="paper" style="text-align:center;padding:40px"><h2 style="font-size:1.5em">구간을 하나씩 눌러 베스트 글을 공개하세요</h2><p class="muted">1등 모둠이 고친 문장과 바꾼 이유를 읽어 줍니다. 투표한 기기 ${V.voters}대</p></div>`;
@@ -242,23 +255,24 @@ function vPresent() {
   if (sec) {
     const W = presWinners(sec, V);
     if (!W.max) body = `<div class="paper"><h2>${esc(sec.name)}</h2><p class="muted">${sec.cands.length ? '이 구간은 아직 투표가 없어요.' : '이 구간은 고친 모둠이 없어요.'}</p></div>`;
-    else body = W.win.map(g => {
+    else body = W.win.slice().sort((a, b) => (a === SP[sec.name] ? -1 : b === SP[sec.name] ? 1 : a - b)).map(g => {
+      if (W.win.length > 1 && g !== SP[sec.name]) return `<div class="paper" style="padding:18px 32px"><div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap"><div class="stamp" style="font-size:.9em;transform:none;background:#fff">공동 1등</div><b style="font-size:1.2em">${g}모둠</b><span>👍 ${W.max}표 · 명탐정 기자 점수 +${V.bestPts || 3}</span><span class="muted">발표는 ${SP[sec.name]}모둠이 대표로 해요</span></div></div>`;
       const ch = (D.changes[g] || []).filter(c => c.sec === sec.name);
       const ok = k => (D.rlines || []).find(r => r.target === g && r.key === k);
       return `<div class="paper" style="padding:26px 32px">
-        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap"><div class="stamp" style="font-size:1em;transform:none;background:#fff">${W.win.length > 1 ? '공동 1등' : '베스트'}</div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap"><div class="stamp" style="font-size:1em;transform:none;background:#fff">${W.win.length > 1 ? '공동 1등 · 🎤 발표' : '베스트'}</div>
           <h2 style="margin:0;font-size:1.45em">${esc(sec.name)} · ${g}모둠</h2><span style="font-size:1.1em">👍 ${W.max}표</span></div>
         ${(() => { const b = ((V.best || {})[sec.name] || { win: [] }).win.find(x => x.g === g); return b ? (b.copied ? `<p class="muted" style="margin:10px 0 0">예시 문장 활용 · 예시 문장과 ${b.sim}% 겹쳐서(80% 이상) 베스트 점수는 없어요.</p>` : `<p style="margin:10px 0 0;color:var(--ok);font-weight:700">명탐정 기자 점수 +${V.bestPts || 3}</p>`) : ''; })()}
-        <p style="font-size:1.15em;margin:14px 0 18px">🎤 <b>${g}모둠</b>, 왜 이렇게 고쳤는지 읽어 주세요.</p>
+        <p style="font-size:1.15em;margin:14px 0 18px">🎤 <b>${g}모둠</b>, 문장을 고친 사람이 고친 문장과 바꾼 이유를 읽어 주세요.</p>
         ${ch.map(c => { const r = ok(c.key);
           return `<div class="pchg">
             ${c.added ? '<div class="lab">새로 넣은 문장</div>' : `<div class="lab">원래 문장</div><div class="orig">${esc(c.orig)}</div>`}
             <div class="lab">고친 문장</div><div class="new">${c.del ? '(이 문장을 지웠어요)' : esc(c.text)}</div>
-            <div class="lab">바꾼 이유</div><div class="why">"${esc(c.reason || '')}"${c.who ? ` <span class="muted">· ${esc(c.role)} ${esc(c.who)}</span>` : ''}</div>
+            <div class="lab">바꾼 이유</div><div class="why">"${esc(c.reason || '')}"</div>${c.who ? `<div style="margin-top:6px;font-weight:700">🎤 ${esc(c.role)} · ${esc(c.who)}</div>` : ''}
             ${r ? `<div class="muted" style="margin-top:6px">상호 심사: ${r.verdict === 'ok' ? '👍 타당해요' : '🤔 아쉬워요'}${r.comment ? ' · ' + esc(r.comment) : ''}</div>` : ''}
           </div>`; }).join('') || '<p class="muted">고친 문장 정보가 없어요.</p>'}
       </div>`;
-    }).join('') + `<div class="paper"><div class="m">이 구간 득표</div>${W.all.map(x => `<span style="display:inline-block;margin:6px 16px 0 0;font-size:1.05em">${x.g}모둠 <b>${x.n}</b>표</span>`).join('')}${W.win.length > 1 ? '<p class="muted" style="margin:8px 0 0">공동 1등이면 두 모둠 모두 읽어요. 우리 반 보고서에는 상호 심사에서 \'타당해요\'를 더 받은 글이 실려요.</p>' : ''}</div>`;
+    }).join('') + `<div class="paper"><div class="m">이 구간 득표</div>${W.all.map(x => `<span style="display:inline-block;margin:6px 16px 0 0;font-size:1.05em">${x.g}모둠 <b>${x.n}</b>표</span>`).join('')}${W.win.length > 1 ? '<p class="muted" style="margin:8px 0 0">공동 1등은 모두 +3점이에요. 발표는 앞 구간에서 발표를 덜 한 모둠 → 이 구간 \'타당해요\'가 많은 모둠 → 모둠 번호 순으로 한 모둠이 대표로 해요.</p>' : ''}</div>`;
   }
   return `<div class="col" style="flex:1"><div class="pgrid">${cards}</div>${body}</div>`;
 }
