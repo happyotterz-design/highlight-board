@@ -164,7 +164,7 @@ textarea{resize:vertical;min-height:58px}
 <div class="sheet" id="sheet"><div class="inner" id="sheetInner"></div></div>
 <div class="verdict" id="verdict"><div class="vbox" id="vbox"></div></div>
 
-<script src="common.js?v=19"></script>
+<script src="common.js?v=20"></script>
 <script>
 let B = null;              // boot: 글, 카드, 단서, 구역
 let S = null;              // 우리 모둠 상태
@@ -328,7 +328,7 @@ function allItems() {
 }
 function navItems(items) {
   const fm = flagMap(), pk = myPicked();
-  const flagged = it => it.added || (fm[it.key] || []).length || pk[it.key];
+  const flagged = it => it.added || (fm[it.key] || []).length;   // 결함이 아닌데 1라운드에서 짚은 문장은 빼기
   const mine = it => it.added || (fm[it.key] || []).some(f => f.role === me.role);
   if (!rwMode) rwMode = items.some(mine) ? 'mine' : 'flag';
   if (rwMode === 'mine') return items.filter(mine);
@@ -349,7 +349,7 @@ function renderRewrite() {
   const fmC = it2 => it2.added || (fm[it2.key] || []).some(f => f.role === me.role);
   $('main').innerHTML = `<div class="paper"><h2>보고서 복원 · 글 전체</h2><div class="who g"><b>👤 내 담당 문장은 내가 · 👥 저장은 모둠 공동</b> · 저장한 문장은 모둠의 글 한 편이 돼요. 같은 문장을 다시 저장하면 마지막 것만 남아요.</div>
       <p class="muted">고칠 문장이 <b>하나씩</b> 나옵니다. ① 무엇이 문제인지 보고 ② 문장을 고치고 ③ <b>왜 이렇게 바꿨는지</b> 한 줄 적은 뒤 ④ '저장하고 다음 ▶'. 저장한 문장은 우리 모둠 태블릿 모두에 보여요. 처음엔 <b>내 역할(${esc(me.role)}) 담당 문장</b>만 나와요.</p>
-      <div class="cards">${modeBtn('mine', '내 담당', items.filter(fmC).length)}${modeBtn('flag', '고칠 문장 전체', items.filter(i => i.added || (fm[i.key] || []).length || pk[i.key]).length)}${modeBtn('all', '모든 문장', items.length)}
+      <div class="cards">${modeBtn('mine', '내 담당', items.filter(fmC).length)}${modeBtn('flag', '고칠 문장 전체', items.filter(i => i.added || (fm[i.key] || []).length).length)}${modeBtn('all', '모든 문장', items.length)}
         <span class="muted" style="margin-left:auto;align-self:center">이 목록에서 저장 ${savedN} / ${list.length}</span></div></div>
     <div class="paper">
       <div class="chips">${B.sections.map(sec => `<span class="chipsec">${esc(sec.name)}</span>` + items.filter(i => i.sec === sec.name).map(i => {
