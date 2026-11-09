@@ -443,8 +443,9 @@ function submitFind(p) {
   needClass_();
   const st = getState_(); need_(st.phase === 1, '지금은 결함 수사 시간이 아니에요.');
   const conf = conf_(); const g = Number(p.group); checkGroupRole_(g, p.role, conf);
-  const keys = (p.keys || []).map(String).filter(k => /^\d+-\d+$/.test(k)).slice(0, 8);
+  const keys = (p.keys || []).map(String).filter(k => /^\d+-\d+$/.test(k));
   need_(keys.length, '문장을 하나 이상 골라 주세요.');
+  need_(keys.length <= 2, '문장은 한 번에 두 개까지만 고를 수 있어요.');
   need_(CARDS.some(c => c[0] === p.card), '결함 카드를 하나 골라 주세요.');
   const problem = clean_(p.problem, 300), fix = '';   // 1라운드는 문제 표시만. 고치기는 2라운드에서
 

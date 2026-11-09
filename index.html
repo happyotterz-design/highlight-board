@@ -164,7 +164,7 @@ textarea{resize:vertical;min-height:58px}
 <div class="sheet" id="sheet"><div class="inner" id="sheetInner"></div></div>
 <div class="verdict" id="verdict"><div class="vbox" id="vbox"></div></div>
 
-<script src="common.js?v=20"></script>
+<script src="common.js?v=21"></script>
 <script>
 let B = null;              // boot: 글, 카드, 단서, 구역
 let S = null;              // 우리 모둠 상태
@@ -587,7 +587,7 @@ document.addEventListener('click', e => {
   if (t.id === 'register') { me.who = ($('whoInput').value || '').trim(); if (viewer() && !me.who) me.who = '참관'; if (!me.who) { $('whoInput').focus(); $('whoInput').placeholder = '이름을 꼭 써 주세요'; return; } picking = false; store('case_me', me); S = null; lastSig = ''; render(); return poll(true); }
   if (t.id === 'change') { if (confirm2(t, '다시 누르면 모둠·역할을 바꿔요')) { picking = true; render(); } return; }
   const tb = t.closest('[data-tab]'); if (tb) { tab = tb.dataset.tab; render(); return; }
-  const s = t.closest('.s'); if (s && phase() === 1) { const k = s.dataset.k; picked.has(k) ? picked.delete(k) : picked.add(k); editing = !!($('problem')?.value); render(); return; }
+  const s = t.closest('.s'); if (s && phase() === 1) { const k = s.dataset.k; if (!picked.has(k) && picked.size >= 2) return alert2('문장은 한 번에 두 개까지만 고를 수 있어요. 결함이 숨어 있다고 생각하는 문장만 골라 주세요.'); picked.has(k) ? picked.delete(k) : picked.add(k); editing = !!($('problem')?.value); render(); return; }
   const cd = t.closest('[data-card]'); if (cd) {
     card = cd.dataset.card;
     document.querySelectorAll('[data-card]').forEach(b => b.classList.toggle('on', b.dataset.card === card));
